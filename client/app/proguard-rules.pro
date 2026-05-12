@@ -11,3 +11,9 @@
 # kotlinx.serialization runtime
 -dontwarn kotlinx.serialization.**
 -keepattributes *Annotation*, InnerClasses
+
+# OkHttp / Ktor 전이 의존 (SLF4J, Guava, Animal Sniffer)
+-dontwarn org.slf4j.**
+-dontwarn com.google.guava.**
+-dontwarn com.google.j2objc.**
+-dontwarn java.lang.instrument.**
