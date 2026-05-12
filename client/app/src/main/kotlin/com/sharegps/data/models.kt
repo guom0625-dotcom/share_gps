@@ -26,3 +26,24 @@ data class LocationUpdateMsg(
     val accuracy: Double?,
     val recordedAt: Long,
 )
+
+@Serializable
+data class ShareState(
+    val mode: String,
+    val precisionMode: String = "exact",
+    val pausedUntil: Long? = null,
+)
+
+@Serializable
+data class Me(
+    val id: String,
+    val name: String,
+    val role: String,
+    val shareState: ShareState,
+)
+
+@Serializable
+data class ShareStateRequest(
+    val mode: String,
+    val minutes: Int? = null,
+)

@@ -18,26 +18,47 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sharegps.data.FamilyMember
+import com.sharegps.ui.settings.ShareStateSheet
+import com.sharegps.ui.settings.ShareStateViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FamilyListScreen(
     onViewMap: (id: String, name: String) -> Unit,
     vm: FamilyViewModel = viewModel(),
+    ssVm: ShareStateViewModel = viewModel(),
 ) {
     val members by vm.members.collectAsState()
     val loading by vm.loading.collectAsState()
     val error by vm.error.collectAsState()
+    val myMode by ssVm.mode.collectAsState()
+    var showSheet by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text("가족 위치") },
             actions = {
+                TextButton(onClick = { showSheet = true }) {
+                    Text(
+                        text = when (myMode) {
+                            "paused" -> "⏸ 일시정지"
+                            "off"    -> "⛔ 중단"
+                            else     -> "● 공유 중"
+                        },
+                        color = when (myMode) {
+                            "sharing" -> MaterialTheme.colorScheme.primary
+                            else      -> MaterialTheme.colorScheme.error
+                        },
+                    )
+                }
                 TextButton(onClick = vm::load, enabled = !loading) { Text("새로고침") }
             },
         )
@@ -65,6 +86,10 @@ fun FamilyListScreen(
                 }
             }
         }
+    }
+
+    if (showSheet) {
+        ShareStateSheet(onDismiss = { showSheet = false }, vm = ssVm)
     }
 }
 
