@@ -1,0 +1,3 @@
+-keep class com.sharegps.** { *; }
+-keepattributes *Annotation*
+-keepattributes SourceFile,LineNumberTable

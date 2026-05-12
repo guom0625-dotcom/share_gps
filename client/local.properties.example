@@ -1,0 +1,2 @@
+# 이 파일을 local.properties로 복사 후 실제 경로 입력 (커밋 금지)
+sdk.dir=/path/to/android/sdk
