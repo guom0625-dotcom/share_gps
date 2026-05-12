@@ -30,6 +30,19 @@
             </intent-filter>
         </activity>
 
+        <service
+            android:name=".location.LocationService"
+            android:foregroundServiceType="location"
+            android:exported="false" />
+
+        <receiver
+            android:name=".location.BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>

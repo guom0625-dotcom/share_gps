@@ -7,3 +7,7 @@
 -dontwarn javax.annotation.**
 -dontwarn javax.annotation.concurrent.**
 -dontwarn org.checkerframework.**
+
+# kotlinx.serialization runtime
+-dontwarn kotlinx.serialization.**
+-keepattributes *Annotation*, InnerClasses
