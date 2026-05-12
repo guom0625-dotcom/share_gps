@@ -39,9 +39,9 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         composable("home") {
-                            FamilyListScreen { id, name ->
+                            FamilyListScreen(onViewMap = { id, name ->
                                 nav.navigate("map/$id/${Uri.encode(name)}")
-                            }
+                            })
                         }
                         composable("map/{userId}/{name}") { back ->
                             val userId = back.arguments?.getString("userId") ?: return@composable

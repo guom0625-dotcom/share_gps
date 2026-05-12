@@ -12,7 +12,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PullToRefreshBox
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -36,7 +35,12 @@ fun FamilyListScreen(
     val error by vm.error.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize()) {
-        TopAppBar(title = { Text("가족 위치") })
+        TopAppBar(
+            title = { Text("가족 위치") },
+            actions = {
+                TextButton(onClick = vm::load, enabled = !loading) { Text("새로고침") }
+            },
+        )
 
         error?.let {
             Text(
@@ -46,20 +50,18 @@ fun FamilyListScreen(
             )
         }
 
-        PullToRefreshBox(
-            isRefreshing = loading,
-            onRefresh = vm::load,
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            if (members.isEmpty() && !loading) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("가족 구성원이 없습니다", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            } else {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(members, key = { it.id }) { member ->
-                        MemberRow(member = member, onViewMap = { onViewMap(member.id, member.name) })
-                    }
+        if (loading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else if (members.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("가족 구성원이 없습니다", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        } else {
+            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                items(members, key = { it.id }) { member ->
+                    MemberRow(member = member, onViewMap = { onViewMap(member.id, member.name) })
                 }
             }
         }
@@ -87,9 +89,9 @@ private fun MemberRow(member: FamilyMember, onViewMap: () -> Unit) {
 private fun relativeTime(ts: Long): String {
     val diff = System.currentTimeMillis() - ts
     return when {
-        diff < 60_000L        -> "방금 전"
-        diff < 3_600_000L     -> "${diff / 60_000}분 전"
-        diff < 86_400_000L    -> "${diff / 3_600_000}시간 전"
-        else                  -> "${diff / 86_400_000}일 전"
+        diff < 60_000L     -> "방금 전"
+        diff < 3_600_000L  -> "${diff / 60_000}분 전"
+        diff < 86_400_000L -> "${diff / 3_600_000}시간 전"
+        else               -> "${diff / 86_400_000}일 전"
     }
 }
