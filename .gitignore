@@ -1,0 +1,70 @@
+# ─────────────────────────────────────────
+# 비밀/환경 파일
+# ─────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.keystore
+*.jks
+
+# ─────────────────────────────────────────
+# Node.js (server/)
+# ─────────────────────────────────────────
+node_modules/
+dist/
+build/
+*.log
+npm-debug.log*
+.npm/
+.node_repl_history
+coverage/
+
+# SQLite 데이터
+server/data/
+*.sqlite3
+*.sqlite3-journal
+*.db
+
+# ─────────────────────────────────────────
+# Android / Gradle (client/)
+# ─────────────────────────────────────────
+client/**/build/
+client/**/.gradle/
+client/**/.cxx/
+client/local.properties
+client/**/release/
+client/captures/
+
+# Android Studio / IntelliJ
+*.iml
+.idea/
+.gradle/
+
+# Kotlin
+.kotlin/
+
+# 키스토어
+*.jks
+*.keystore
+
+# ─────────────────────────────────────────
+# OS
+# ─────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─────────────────────────────────────────
+# Editor
+# ─────────────────────────────────────────
+.vscode/
+*.swp
+*.swo
+*~
+
+# ─────────────────────────────────────────
+# Claude Code 로컬 설정 (개인 권한 파일)
+# ─────────────────────────────────────────
+.claude/settings.local.json
