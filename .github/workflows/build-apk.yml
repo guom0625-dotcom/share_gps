@@ -28,7 +28,9 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 -d > client/app/keystore.jks
+          # tr로 공백/BOM 계열 제거 후 디코딩
+          printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > client/app/keystore.jks
+          echo "keystore size: $(wc -c < client/app/keystore.jks) bytes"
 
       - name: Build release APK
         working-directory: client
