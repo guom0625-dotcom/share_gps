@@ -9,7 +9,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
-import android.os.Build
 import android.os.IBinder
 import android.os.Looper
 import androidx.core.app.ActivityCompat
@@ -55,7 +54,7 @@ class LocationService : Service() {
     private lateinit var fusedClient: FusedLocationProviderClient
     private lateinit var dao: LocationQueueDao
     private lateinit var apiClient: ApiClient
-    private lateinit var wsClient: WebSocketClient
+    private var wsClient: WebSocketClient? = null
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -67,16 +66,17 @@ class LocationService : Service() {
         fusedClient = LocationServices.getFusedLocationProviderClient(this)
 
         val key = KeyStore(this).getKey() ?: run { stopSelf(); return }
-
         dao = AppDatabase.get(this).locationQueueDao()
         apiClient = ApiClient(BuildConfig.SERVER_URL, key)
-        wsClient = WebSocketClient(BuildConfig.SERVER_URL, key).also {
-            it.onActiveModeChanged = { active ->
+
+        wsClient = WebSocketClient.get(this)?.also { ws ->
+            ws.onActiveModeChanged = { active ->
                 if (active != activeMode) {
                     activeMode = active
                     restartLocationUpdates(active)
                 }
             }
+            if (!ws.isConnected) ws.connect()
         }
 
         ServiceCompat.startForeground(
@@ -84,7 +84,6 @@ class LocationService : Service() {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
         )
         requestLocationUpdates(false)
-        wsClient.connect()
         startUploadLoop()
     }
 
@@ -142,7 +141,7 @@ class LocationService : Service() {
 
     override fun onDestroy() {
         locationCallback?.let { fusedClient.removeLocationUpdates(it) }
-        wsClient.disconnect()
+        wsClient?.onActiveModeChanged = null
         scope.cancel()
         super.onDestroy()
     }

@@ -21,6 +21,10 @@ android {
             "String", "SERVER_URL",
             "\"${System.getenv("SERVER_URL") ?: "https://guom0625.duckdns.org"}\""
         )
+        buildConfigField(
+            "String", "NAVER_MAPS_CLIENT_ID",
+            "\"${System.getenv("NAVER_MAPS_CLIENT_ID") ?: ""}\""
+        )
     }
 
     signingConfigs {
@@ -95,4 +99,10 @@ dependencies {
 
     // FusedLocationProvider
     implementation("com.google.android.gms:play-services-location:21.3.0")
+
+    // Naver Maps
+    implementation("com.naver.maps:map-sdk:3.18.0")
+
+    // ViewModel Compose
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
 }

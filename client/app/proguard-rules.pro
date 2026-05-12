@@ -17,3 +17,7 @@
 -dontwarn com.google.guava.**
 -dontwarn com.google.j2objc.**
 -dontwarn java.lang.instrument.**
+
+# Naver Maps SDK
+-keep class com.naver.maps.** { *; }
+-dontwarn com.naver.maps.**

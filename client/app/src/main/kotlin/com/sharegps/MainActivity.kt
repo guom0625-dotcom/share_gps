@@ -1,5 +1,6 @@
 package com.sharegps
 
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -11,7 +12,8 @@ import androidx.navigation.compose.rememberNavController
 import com.sharegps.data.KeyStore
 import com.sharegps.location.LocationService
 import com.sharegps.ui.enroll.EnrollScreen
-import com.sharegps.ui.home.HomeScreen
+import com.sharegps.ui.family.FamilyListScreen
+import com.sharegps.ui.map.LiveMapScreen
 
 class MainActivity : ComponentActivity() {
     override fun onResume() {
@@ -37,7 +39,18 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         composable("home") {
-                            HomeScreen()
+                            FamilyListScreen { id, name ->
+                                nav.navigate("map/$id/${Uri.encode(name)}")
+                            }
+                        }
+                        composable("map/{userId}/{name}") { back ->
+                            val userId = back.arguments?.getString("userId") ?: return@composable
+                            val name   = Uri.decode(back.arguments?.getString("name") ?: "")
+                            LiveMapScreen(
+                                targetId   = userId,
+                                targetName = name,
+                                onBack     = { nav.popBackStack() },
+                            )
                         }
                     }
                 }
