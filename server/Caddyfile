@@ -1,0 +1,3 @@
+guom0625.duckdns.org {
+    reverse_proxy localhost:3000
+}
