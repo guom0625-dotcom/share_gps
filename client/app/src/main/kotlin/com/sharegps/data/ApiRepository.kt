@@ -27,11 +27,11 @@ class ApiRepository(private val serverUrl: String, private val apiKey: String) {
     suspend fun me(): Me =
         http.get("$serverUrl/me") { bearerAuth(apiKey) }.body()
 
-    suspend fun setShareState(mode: String, minutes: Int? = null): Boolean = try {
+    suspend fun setShareState(mode: String, pausedUntilMinutes: Int? = null): Boolean = try {
         http.post("$serverUrl/me/share-state") {
             bearerAuth(apiKey)
             contentType(ContentType.Application.Json)
-            setBody(ShareStateRequest(mode, minutes))
+            setBody(ShareStateRequest(mode, pausedUntilMinutes = pausedUntilMinutes))
         }.status.isSuccess()
     } catch (_: Exception) { false }
 }

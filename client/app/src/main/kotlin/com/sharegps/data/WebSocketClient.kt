@@ -2,9 +2,15 @@ package com.sharegps.data
 
 import android.content.Context
 import com.sharegps.BuildConfig
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -34,16 +40,16 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
         .pingInterval(30, TimeUnit.SECONDS)
         .build()
 
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val activeViewers: MutableSet<String> = Collections.synchronizedSet(mutableSetOf())
 
-    // LocationService registers this to flip active mode
     var onActiveModeChanged: ((Boolean) -> Unit)? = null
 
-    // LiveMapViewModel collects this to update map position
     private val _locationUpdates = MutableSharedFlow<LocationUpdateMsg>(extraBufferCapacity = 50)
     val locationUpdates: SharedFlow<LocationUpdateMsg> = _locationUpdates.asSharedFlow()
 
     @Volatile private var ws: WebSocket? = null
+    @Volatile private var reconnectJob: Job? = null
     val isConnected: Boolean get() = ws != null
     val isBeingWatched: Boolean get() = activeViewers.isNotEmpty()
 
@@ -56,8 +62,17 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
         ws?.send(json)
     }
 
+    private fun scheduleReconnect(delayMs: Long = 5_000L) {
+        if (reconnectJob?.isActive == true) return
+        reconnectJob = scope.launch {
+            delay(delayMs)
+            if (ws == null) connect()
+        }
+    }
+
     private val listener = object : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) {
+            reconnectJob?.cancel()
             webSocket.send("""{"type":"auth","key":"$apiKey"}""")
         }
 
@@ -93,10 +108,16 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
             ws = null
+            activeViewers.clear()
+            onActiveModeChanged?.invoke(false)
+            scheduleReconnect()
         }
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
             ws = null
+            activeViewers.clear()
+            onActiveModeChanged?.invoke(false)
+            if (code < 4000) scheduleReconnect()
         }
     }
 }

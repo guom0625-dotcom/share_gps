@@ -90,13 +90,13 @@ class LocationService : Service() {
     private fun startUploadLoop() {
         scope.launch {
             while (isActive) {
-                delay(2 * 60_000L)
                 runCatching {
                     val rows = dao.getOldest()
                     if (rows.isNotEmpty() && apiClient.uploadBatch(rows)) {
                         dao.deleteByIds(rows.map { it.id })
                     }
                 }
+                delay(2 * 60_000L)
             }
         }
     }

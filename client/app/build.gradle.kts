@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -5,6 +7,14 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
 }
+
+val localProps = Properties().also { props ->
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { props.load(it) }
+}
+
+fun localOrEnv(key: String): String =
+    localProps.getProperty(key) ?: System.getenv(key) ?: ""
 
 android {
     namespace   = "com.sharegps"
@@ -19,11 +29,11 @@ android {
 
         buildConfigField(
             "String", "SERVER_URL",
-            "\"${System.getenv("SERVER_URL") ?: "https://guom0625.duckdns.org"}\""
+            "\"${localOrEnv("SERVER_URL").ifEmpty { "https://guom0625.duckdns.org" }}\""
         )
         buildConfigField(
             "String", "NAVER_MAPS_CLIENT_ID",
-            "\"${System.getenv("NAVER_MAPS_CLIENT_ID") ?: ""}\""
+            "\"${localOrEnv("NAVER_MAPS_CLIENT_ID")}\""
         )
     }
 

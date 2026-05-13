@@ -23,7 +23,7 @@ class AppUpdater(private val context: Context) {
         val request = DownloadManager.Request(Uri.parse(url))
             .setTitle("Share GPS 업데이트")
             .setDescription("$tagName 다운로드 중…")
-            .setDestinationUri(Uri.fromFile(dest))
+            .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, "share-gps.apk")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
 
         val dm = context.getSystemService(DownloadManager::class.java)

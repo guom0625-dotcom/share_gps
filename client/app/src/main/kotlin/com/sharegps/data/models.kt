@@ -45,5 +45,6 @@ data class Me(
 @Serializable
 data class ShareStateRequest(
     val mode: String,
-    val minutes: Int? = null,
+    val precisionMode: String = "exact",
+    val pausedUntilMinutes: Int? = null,
 )

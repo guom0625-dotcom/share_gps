@@ -30,8 +30,8 @@ class ShareStateViewModel(app: Application) : AndroidViewModel(app) {
     fun setMode(mode: String, minutes: Int? = null) {
         viewModelScope.launch {
             _loading.value = true
-            runCatching { repo.setShareState(mode, minutes) }
-                .onSuccess { _mode.value = mode }
+            val ok = runCatching { repo.setShareState(mode, minutes) }.getOrDefault(false)
+            if (ok) _mode.value = mode
             _loading.value = false
         }
     }
