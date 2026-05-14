@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -15,6 +16,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -51,23 +53,36 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
 
     Column(modifier = Modifier.fillMaxSize()) {
         // 위쪽 절반: 가족 리스트
-        Box(modifier = Modifier.weight(1f)) {
-            when {
-                loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                members.isEmpty() -> Text(
-                    "가족 구성원이 없습니다",
-                    modifier = Modifier.align(Alignment.Center),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "가족 위치",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
                 )
-                else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(members, key = { it.id }) { member ->
-                        MemberRow(
-                            member     = member,
-                            position   = positions[member.id],
-                            selected   = member.id == selectedId,
-                            onClick    = { vm.selectMember(member.id) },
-                        )
-                        HorizontalDivider(modifier = Modifier.fillMaxWidth())
+                TextButton(onClick = vm::load, enabled = !loading) { Text("새로고침") }
+            }
+            Box(modifier = Modifier.weight(1f)) {
+                when {
+                    loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    members.isEmpty() -> Text(
+                        "가족 구성원이 없습니다",
+                        modifier = Modifier.align(Alignment.Center),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        items(members, key = { it.id }) { member ->
+                            MemberRow(
+                                member   = member,
+                                position = positions[member.id],
+                                selected = member.id == selectedId,
+                                onClick  = { vm.selectMember(member.id) },
+                            )
+                            HorizontalDivider(modifier = Modifier.fillMaxWidth())
+                        }
                     }
                 }
             }
