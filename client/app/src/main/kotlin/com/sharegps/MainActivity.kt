@@ -1,6 +1,5 @@
 package com.sharegps
 
-import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -20,8 +19,7 @@ import androidx.navigation.compose.rememberNavController
 import com.sharegps.data.KeyStore
 import com.sharegps.location.LocationService
 import com.sharegps.ui.enroll.EnrollScreen
-import com.sharegps.ui.family.FamilyListScreen
-import com.sharegps.ui.map.LiveMapScreen
+import com.sharegps.ui.home.HomeScreen
 import com.sharegps.ui.permission.PermissionGate
 import com.sharegps.update.AppUpdater
 import com.sharegps.update.UpdateChecker
@@ -41,7 +39,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface {
-                    // Update check
                     var updateTag by remember { mutableStateOf<String?>(null) }
                     LaunchedEffect(Unit) {
                         val latest = withContext(Dispatchers.IO) { UpdateChecker.latestTag() }
@@ -78,19 +75,8 @@ class MainActivity : ComponentActivity() {
                         }
                         composable("home") {
                             PermissionGate {
-                                FamilyListScreen(onViewMap = { id, name ->
-                                    nav.navigate("map/$id/${Uri.encode(name)}")
-                                })
+                                HomeScreen()
                             }
-                        }
-                        composable("map/{userId}/{name}") { back ->
-                            val userId = back.arguments?.getString("userId") ?: return@composable
-                            val name   = Uri.decode(back.arguments?.getString("name") ?: "")
-                            LiveMapScreen(
-                                targetId   = userId,
-                                targetName = name,
-                                onBack     = { nav.popBackStack() },
-                            )
                         }
                     }
                 }
