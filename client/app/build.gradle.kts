@@ -111,7 +111,7 @@ dependencies {
     implementation("com.google.android.gms:play-services-location:21.3.0")
 
     // Naver Maps
-    implementation("com.naver.maps:map-sdk:3.18.0")
+    implementation("com.naver.maps:map-sdk:3.23.2")
 
     // ViewModel Compose
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
