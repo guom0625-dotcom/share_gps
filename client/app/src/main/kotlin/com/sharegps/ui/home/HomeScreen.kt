@@ -190,10 +190,11 @@ private fun FamilyMapView(
         }
     }
 
-    // 멤버 선택 시 해당 위치로 카메라 이동
-    LaunchedEffect(selectedId, naverMap) {
+    // 선택된 멤버의 위치가 바뀔 때마다 카메라 추적
+    val selectedPos = selectedId?.let { positions[it] }
+    LaunchedEffect(selectedPos, naverMap) {
         val map = naverMap ?: return@LaunchedEffect
-        val pos = selectedId?.let { positions[it] } ?: return@LaunchedEffect
+        val pos = selectedPos ?: return@LaunchedEffect
         map.moveCamera(CameraUpdate.scrollAndZoomTo(LatLng(pos.lat, pos.lng), 15.0))
     }
 
