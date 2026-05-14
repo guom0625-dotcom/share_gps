@@ -62,7 +62,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private fun watchAll(members: List<FamilyMember>) {
         val ws = WebSocketClient.get(getApplication()) ?: return
         for (member in members) {
-            ws.sendRaw("""{"type":"watch_start","targetUserId":"${member.id}"}""")
+            ws.watchStart(member.id)
         }
         viewModelScope.launch {
             ws.locationUpdates.collect { msg ->
@@ -75,7 +75,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         super.onCleared()
         val ws = WebSocketClient.get(getApplication()) ?: return
         for (member in _members.value) {
-            ws.sendRaw("""{"type":"watch_stop","targetUserId":"${member.id}"}""")
+            ws.watchStop(member.id)
         }
     }
 }

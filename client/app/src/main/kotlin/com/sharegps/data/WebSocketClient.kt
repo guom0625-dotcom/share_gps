@@ -42,6 +42,7 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val activeViewers: MutableSet<String> = Collections.synchronizedSet(mutableSetOf())
+    private val watchingTargets: MutableSet<String> = Collections.synchronizedSet(mutableSetOf())
 
     var onActiveModeChanged: ((Boolean) -> Unit)? = null
 
@@ -62,6 +63,16 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
         ws?.send(json)
     }
 
+    fun watchStart(targetUserId: String) {
+        watchingTargets.add(targetUserId)
+        sendRaw("""{"type":"watch_start","targetUserId":"$targetUserId"}""")
+    }
+
+    fun watchStop(targetUserId: String) {
+        watchingTargets.remove(targetUserId)
+        sendRaw("""{"type":"watch_stop","targetUserId":"$targetUserId"}""")
+    }
+
     private fun scheduleReconnect(delayMs: Long = 5_000L) {
         if (reconnectJob?.isActive == true) return
         reconnectJob = scope.launch {
@@ -80,6 +91,11 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
             runCatching {
                 val json = JSONObject(text)
                 when (json.optString("type")) {
+                    "auth_ok" -> {
+                        for (targetId in watchingTargets) {
+                            webSocket.send("""{"type":"watch_start","targetUserId":"$targetId"}""")
+                        }
+                    }
                     "watching" -> {
                         val viewerId = json.optString("viewerUserId")
                         if (viewerId.isNotEmpty() && activeViewers.add(viewerId)) {
