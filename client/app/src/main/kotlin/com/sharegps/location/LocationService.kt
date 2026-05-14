@@ -130,6 +130,9 @@ class LocationService : Service() {
                             timestamp = loc.time,
                         )
                     )
+                    wsClient?.sendRaw(
+                        """{"type":"location","lat":${loc.latitude},"lng":${loc.longitude},"accuracy":${loc.accuracy},"recordedAt":${loc.time}}"""
+                    )
                 }
             }
         }
