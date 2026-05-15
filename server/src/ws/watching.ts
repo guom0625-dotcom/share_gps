@@ -6,10 +6,9 @@ interface SocketLike {
 
 const WS_OPEN = 1;
 
-function safeSend(sock: SocketLike, msg: string): void {
-    if (sock.readyState === WS_OPEN) {
-        try { sock.send(msg); } catch { /* ignore closed socket */ }
-    }
+function safeSend(sock: SocketLike, msg: string): boolean {
+    if (sock.readyState !== WS_OPEN) return false;
+    try { sock.send(msg); return true; } catch { return false; }
 }
 
 export class WatchingSession {
@@ -68,8 +67,9 @@ export class WatchingSession {
         }
     }
 
-    isConnected(userId: string): boolean {
-        return this.connections.has(userId);
+    isReachable(userId: string): boolean {
+        const sock = this.connections.get(userId);
+        return sock !== undefined && sock.readyState === WS_OPEN;
     }
 
     getWatchersOf(targetId: string): string[] {

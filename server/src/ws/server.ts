@@ -112,10 +112,13 @@ export function registerWsServer(app: FastifyInstance, db: Db): void {
                 case 'watch_start': {
                     const targetId = msg.data.targetUserId;
                     sessions.watchStart(userId, targetId);
-                    if (!sessions.isConnected(targetId)) {
+                    if (!sessions.isReachable(targetId)) {
                         const row = getFcmToken.get(targetId) as { fcm_token: string | null } | undefined;
                         if (row?.fcm_token) {
+                            console.log(`[fcm] sending watch_start to ${targetId}`);
                             void sendFcmToToken(row.fcm_token, { type: 'watch_start' });
+                        } else {
+                            console.log(`[fcm] no token for ${targetId}, cannot wake`);
                         }
                     }
                     break;

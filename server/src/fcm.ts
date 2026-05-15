@@ -26,7 +26,8 @@ export async function sendFcmToToken(token: string, data: Record<string, string>
             data,
             android: { priority: 'high' },
         });
-    } catch {
-        // Stale token or delivery failure — ignore
+        console.log(`[fcm] sent ${JSON.stringify(data)}`);
+    } catch (e) {
+        console.warn(`[fcm] send failed: ${e}`);
     }
 }
