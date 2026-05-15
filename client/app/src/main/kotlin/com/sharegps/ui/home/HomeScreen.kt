@@ -5,6 +5,8 @@ import android.os.Bundle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,12 +19,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -39,6 +38,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -121,6 +123,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
                             position = positions[member.id],
                             selected = member.id == selectedId,
                             isMe     = member.id == vm.myId,
+                            avatar   = avatars[member.id],
                             now      = now,
                             onClick  = { vm.selectMember(member.id) },
                             onPickPhoto = {
@@ -159,16 +162,38 @@ private fun MemberRow(
     position:    LocationUpdateMsg?,
     selected:    Boolean,
     isMe:        Boolean,
+    avatar:      Bitmap?,
     now:         Long,
     onClick:     () -> Unit,
     onPickPhoto: () -> Unit,
 ) {
+    val iconBmp = remember(avatar, member.name) {
+        avatar ?: createInitialMarker(member.name, sizePx = 128)
+    }
     ListItem(
         modifier = Modifier.clickable(onClick = onClick),
         colors = ListItemDefaults.colors(
             containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer
                              else MaterialTheme.colorScheme.surface,
         ),
+        leadingContent = {
+            Image(
+                bitmap = iconBmp.asImageBitmap(),
+                contentDescription = if (isMe) "프로필 사진 변경" else member.name,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .then(
+                        if (isMe) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                        else Modifier
+                    )
+                    .then(
+                        if (isMe) Modifier.clickable(onClick = onPickPhoto)
+                        else Modifier
+                    ),
+            )
+        },
         headlineContent = { Text(member.name) },
         supportingContent = {
             val role = if (member.role == "parent") "부모" else "자녀"
@@ -176,19 +201,6 @@ private fun MemberRow(
             val batt = position?.battery?.let { " · 배터리 $it%" } ?: ""
             Text("$role · $time$batt")
         },
-        trailingContent = if (isMe) ({
-            IconButton(
-                onClick = onPickPhoto,
-                modifier = Modifier.size(36.dp),
-            ) {
-                Icon(
-                    Icons.Default.AddAPhoto,
-                    contentDescription = "프로필 사진 변경",
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }) else null,
     )
 }
 
