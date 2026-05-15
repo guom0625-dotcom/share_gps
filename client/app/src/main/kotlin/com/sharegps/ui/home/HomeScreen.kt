@@ -305,11 +305,9 @@ private fun FamilyMapView(
     val circles     = remember { mutableMapOf<String, CircleOverlay>() }
     val polyline    = remember { PolylineOverlay() }
     val timeMarkers = remember { mutableMapOf<Int, Marker>() }
-    var currentZoom by remember { mutableStateOf(14.0) }
     val transitDot  = remember { createTransitDot() }
     val stayDot     = remember { createStayDot() }
     val pathEvents  = remember(historyPath) { processHistoryPath(historyPath) }
-    val visibleEvents = remember(pathEvents, currentZoom) { filterByZoom(pathEvents, currentZoom) }
 
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
@@ -353,16 +351,11 @@ private fun FamilyMapView(
         }
     }
 
-    LaunchedEffect(naverMap) {
-        val map = naverMap ?: return@LaunchedEffect
-        map.addOnCameraIdleListener { currentZoom = map.cameraPosition.zoom }
-    }
-
-    LaunchedEffect(visibleEvents, naverMap) {
+    LaunchedEffect(pathEvents, naverMap) {
         val map = naverMap ?: return@LaunchedEffect
         timeMarkers.values.forEach { it.map = null }
         timeMarkers.clear()
-        for ((idx, event) in visibleEvents.withIndex()) {
+        for ((idx, event) in pathEvents.withIndex()) {
             val m = Marker()
             m.captionTextSize  = 11f
             m.captionColor     = 0xFF212121.toInt()

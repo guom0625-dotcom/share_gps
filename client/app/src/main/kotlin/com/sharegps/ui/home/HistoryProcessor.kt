@@ -53,29 +53,6 @@ fun processHistoryPath(points: List<HistoryPoint>): List<PathEvent> {
     return events
 }
 
-fun filterByZoom(events: List<PathEvent>, zoom: Double): List<PathEvent> {
-    if (events.size <= 1) return events
-    val intervalMs = if (zoom >= 15.0) 30 * 60_000L else 60 * 60_000L
-    var lastMs = Long.MIN_VALUE / 2
-    val result = mutableListOf<PathEvent>()
-    events.forEachIndexed { index, event ->
-        val isEdge = index == 0 || index == events.lastIndex
-        when (event) {
-            is PathEvent.Stay -> {
-                result.add(event)
-                lastMs = event.toMs
-            }
-            is PathEvent.Transit -> {
-                if (isEdge || event.timeMs - lastMs >= intervalMs) {
-                    result.add(event)
-                    lastMs = event.timeMs
-                }
-            }
-        }
-    }
-    return result
-}
-
 fun formatTime(ms: Long): String {
     val ldt = LocalDateTime.ofInstant(Instant.ofEpochMilli(ms), ZoneId.systemDefault())
     return "%02d:%02d".format(ldt.hour, ldt.minute)
