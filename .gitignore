@@ -65,6 +65,8 @@ desktop.ini
 *~
 
 # ─────────────────────────────────────────
-# Claude Code 로컬 설정 (개인 권한 파일)
+# Claude Code 로컬 설정 / 토큰 파일
 # ─────────────────────────────────────────
-.claude/settings.local.json
+.claude/
+git_token
+server/test_key
