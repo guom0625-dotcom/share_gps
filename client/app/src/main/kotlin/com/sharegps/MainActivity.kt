@@ -3,7 +3,6 @@ package com.sharegps
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -28,13 +27,12 @@ import com.sharegps.location.LocationUploadWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.sharegps.ui.enroll.EnrollScreen
 import com.sharegps.ui.home.HomeScreen
 import com.sharegps.ui.permission.PermissionGate
 import com.sharegps.update.AppUpdater
 import com.sharegps.update.UpdateChecker
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     override fun onResume() {
