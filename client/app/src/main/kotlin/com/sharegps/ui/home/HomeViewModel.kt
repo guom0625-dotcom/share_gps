@@ -120,7 +120,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun loadAvatars(members: List<FamilyMember>) {
-        for (member in members.filter { it.hasAvatar && !_avatars.value.containsKey(member.id) }) {
+        for (member in members.filter { it.hasAvatar && !_avatars.value.containsKey(it.id) }) {
             viewModelScope.launch {
                 val bytes = repo.avatarBytes(member.id) ?: return@launch
                 val bmp = createPhotoMarker(bytes)
