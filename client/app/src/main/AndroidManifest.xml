@@ -36,6 +36,14 @@
             android:foregroundServiceType="location"
             android:exported="false" />
 
+        <service
+            android:name=".ShareGpsFirebaseService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
         <receiver
             android:name=".location.BootReceiver"
             android:exported="false">

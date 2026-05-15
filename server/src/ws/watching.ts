@@ -68,6 +68,14 @@ export class WatchingSession {
         }
     }
 
+    isConnected(userId: string): boolean {
+        return this.connections.has(userId);
+    }
+
+    getWatchersOf(targetId: string): string[] {
+        return Array.from(this.watchers.get(targetId) ?? []);
+    }
+
     sendTo(userId: string, payload: object): void {
         const sock = this.connections.get(userId);
         if (sock) safeSend(sock, JSON.stringify(payload));

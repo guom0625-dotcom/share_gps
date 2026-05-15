@@ -70,3 +70,6 @@ desktop.ini
 .claude/
 git_token
 server/test_key
+server/firebase-credentials.json
+client/app/google-services.json
+*-firebase-adminsdk-*.json

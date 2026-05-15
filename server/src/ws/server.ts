@@ -4,6 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import type { WebSocket } from '@fastify/websocket';
 import type { Db } from '../db.ts';
 import { WatchingSession } from './watching.ts';
+import { sendFcmToToken } from '../fcm.ts';
 
 const AUTH_TIMEOUT_MS = 10_000;
 
@@ -24,6 +25,7 @@ export function registerWsServer(app: FastifyInstance, db: Db): void {
         FROM auth_keys k JOIN users u ON u.id = k.user_id
         WHERE k.key_hash = ? AND k.revoked_at IS NULL AND u.revoked_at IS NULL
     `);
+    const getFcmToken = db.prepare('SELECT fcm_token FROM users WHERE id = ?');
     const touchKey = db.prepare('UPDATE auth_keys SET last_used_at = ? WHERE key_hash = ?');
     const upsertCurrent = db.prepare(`
         INSERT INTO current_location (user_id, lat, lng, accuracy, activity, battery, recorded_at)
@@ -80,6 +82,10 @@ export function registerWsServer(app: FastifyInstance, db: Db): void {
                 authed = true;
                 sessions.addConnection(userId, socket);
                 send({ type: 'auth_ok', userId: user.id, role: user.role });
+                // Re-send current watchers (for FCM-woken reconnects)
+                for (const viewerId of sessions.getWatchersOf(userId)) {
+                    send({ type: 'watching', viewerUserId: viewerId });
+                }
                 return;
             }
 
@@ -103,9 +109,17 @@ export function registerWsServer(app: FastifyInstance, db: Db): void {
                     });
                     break;
                 }
-                case 'watch_start':
-                    sessions.watchStart(userId, msg.data.targetUserId);
+                case 'watch_start': {
+                    const targetId = msg.data.targetUserId;
+                    sessions.watchStart(userId, targetId);
+                    if (!sessions.isConnected(targetId)) {
+                        const row = getFcmToken.get(targetId) as { fcm_token: string | null } | undefined;
+                        if (row?.fcm_token) {
+                            void sendFcmToToken(row.fcm_token, { type: 'watch_start' });
+                        }
+                    }
                     break;
+                }
                 case 'watch_stop':
                     sessions.watchStop(userId, msg.data.targetUserId);
                     break;

@@ -68,6 +68,14 @@ class ApiRepository(private val serverUrl: String, private val apiKey: String) {
         }.body()
     } catch (_: Exception) { emptyList() }
 
+    suspend fun updateFcmToken(token: String): Boolean = try {
+        http.post("$serverUrl/me/fcm-token") {
+            bearerAuth(apiKey)
+            contentType(ContentType.Application.Json)
+            setBody("""{"token":"$token"}""")
+        }.status.isSuccess()
+    } catch (_: Exception) { false }
+
     suspend fun setShareState(mode: String, pausedUntilMinutes: Int? = null): Boolean = try {
         http.post("$serverUrl/me/share-state") {
             bearerAuth(apiKey)

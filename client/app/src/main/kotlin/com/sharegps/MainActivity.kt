@@ -18,9 +18,16 @@ import androidx.compose.runtime.setValue
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.google.firebase.messaging.FirebaseMessaging
+import com.sharegps.data.ApiRepository
 import com.sharegps.data.AuthEvent
 import com.sharegps.data.KeyStore
+import com.sharegps.data.resolveServerUrl
 import com.sharegps.location.LocationService
+import com.sharegps.location.LocationUploadWorker
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import com.sharegps.ui.enroll.EnrollScreen
 import com.sharegps.ui.home.HomeScreen
 import com.sharegps.ui.permission.PermissionGate
@@ -32,7 +39,20 @@ import kotlinx.coroutines.withContext
 class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
-        if (KeyStore(this).hasKey()) LocationService.start(this)
+        if (KeyStore(this).hasKey()) {
+            LocationService.start(this)
+            LocationUploadWorker.schedule(this)
+            registerFcmToken()
+        }
+    }
+
+    private fun registerFcmToken() {
+        FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
+            CoroutineScope(Dispatchers.IO).launch {
+                val key = KeyStore(applicationContext).getKey() ?: return@launch
+                ApiRepository(resolveServerUrl(applicationContext), key).updateFcmToken(token)
+            }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

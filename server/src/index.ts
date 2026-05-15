@@ -13,11 +13,15 @@ import { registerLocationRoutes } from './routes/locations.ts';
 import { registerShareStateRoutes } from './routes/shareState.ts';
 import { registerAvatarRoutes } from './routes/avatar.ts';
 import { registerWsServer } from './ws/server.ts';
+import { initFcm } from './fcm.ts';
+import { registerFcmRoutes } from './routes/fcm.ts';
 
 const PORT = Number(process.env.PORT ?? 3000);
 const HOST = process.env.HOST ?? '0.0.0.0';
 const DB_PATH = process.env.DB_PATH ?? './data/share_gps.sqlite3';
 const LOG_LEVEL = process.env.LOG_LEVEL ?? 'info';
+
+initFcm(process.env.FIREBASE_CREDENTIALS ?? './firebase-credentials.json');
 
 const db = openDb(DB_PATH);
 
@@ -32,6 +36,7 @@ registerFamilyRoutes(app, db, auth);
 registerLocationRoutes(app, db, auth);
 registerShareStateRoutes(app, db, auth);
 registerAvatarRoutes(app, auth);
+registerFcmRoutes(app, db, auth);
 registerWsServer(app, db);
 
 app.get('/health', async () => ({ ok: true, time: Date.now() }));
