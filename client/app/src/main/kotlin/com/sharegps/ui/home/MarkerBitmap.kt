@@ -63,6 +63,17 @@ fun createStayDot(sizePx: Int = 26): Bitmap {
     return bmp
 }
 
+fun resizeForUpload(bytes: ByteArray, maxPx: Int = 512): ByteArray {
+    val src = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return bytes
+    val scale = maxPx.toFloat() / maxOf(src.width, src.height)
+    val bmp = if (scale < 1f)
+        Bitmap.createScaledBitmap(src, (src.width * scale).toInt(), (src.height * scale).toInt(), true)
+    else src
+    return java.io.ByteArrayOutputStream()
+        .also { bmp.compress(Bitmap.CompressFormat.JPEG, 82, it) }
+        .toByteArray()
+}
+
 fun createPhotoMarker(bytes: ByteArray, sizePx: Int = 96): Bitmap {
     val src = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
         ?: return createInitialMarker("?", sizePx)

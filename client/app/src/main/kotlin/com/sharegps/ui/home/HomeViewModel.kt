@@ -131,8 +131,12 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun uploadAvatar(bytes: ByteArray) {
         viewModelScope.launch {
-            val ok = repo.uploadAvatar(bytes)
-            if (ok) load()
+            val compressed = resizeForUpload(bytes)
+            val ok = repo.uploadAvatar(compressed)
+            if (ok) {
+                myId?.let { id -> _avatars.update { it - id } }
+                load()
+            }
         }
     }
 
