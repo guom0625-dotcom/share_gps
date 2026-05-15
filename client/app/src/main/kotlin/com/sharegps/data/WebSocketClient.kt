@@ -45,6 +45,7 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
     private val watchingTargets: MutableSet<String> = Collections.synchronizedSet(mutableSetOf())
 
     var onActiveModeChanged: ((Boolean) -> Unit)? = null
+    var onNoWatchers: (() -> Unit)? = null
 
     private val _locationUpdates = MutableSharedFlow<LocationUpdateMsg>(extraBufferCapacity = 50)
     val locationUpdates: SharedFlow<LocationUpdateMsg> = _locationUpdates.asSharedFlow()
@@ -124,7 +125,7 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
                     }
                     "no_watchers" -> {
                         activeViewers.clear()
-                        onActiveModeChanged?.invoke(false)
+                        onNoWatchers?.invoke()
                     }
                     "location_update" -> {
                         _locationUpdates.tryEmit(

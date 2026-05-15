@@ -101,6 +101,9 @@ class LocationService : Service() {
                     if (!active && !isForeground) stopAndExit()
                 }
             }
+            ws.onNoWatchers = {
+                if (!isForeground) stopAndExit()
+            }
             if (!ws.isConnected) ws.connect()
         }
 
@@ -230,6 +233,7 @@ class LocationService : Service() {
             ActivityRecognition.getClient(this).removeActivityTransitionUpdates(it)
         }
         wsClient?.onActiveModeChanged = null
+        wsClient?.onNoWatchers = null
         scope.cancel()
         super.onDestroy()
     }
