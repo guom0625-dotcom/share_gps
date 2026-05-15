@@ -37,7 +37,7 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
     private val wsUrl = serverUrl.replace("https://", "wss://").replace("http://", "ws://") + "/ws"
 
     private val okClient = OkHttpClient.Builder()
-        .pingInterval(30, TimeUnit.SECONDS)
+        .pingInterval(120, TimeUnit.SECONDS)
         .build()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -51,14 +51,25 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
 
     @Volatile private var ws: WebSocket? = null
     @Volatile private var reconnectJob: Job? = null
+    @Volatile private var intentionalDisconnect = false
     @Volatile var myUserId: String? = null
         private set
     val isConnected: Boolean get() = ws != null
     val isBeingWatched: Boolean get() = activeViewers.isNotEmpty()
 
     fun connect() {
+        intentionalDisconnect = false
         if (ws != null) return
         ws = okClient.newWebSocket(Request.Builder().url(wsUrl).build(), listener)
+    }
+
+    fun disconnect() {
+        intentionalDisconnect = true
+        reconnectJob?.cancel()
+        ws?.close(4001, "background")
+        ws = null
+        activeViewers.clear()
+        onActiveModeChanged?.invoke(false)
     }
 
     fun sendRaw(json: String) {
@@ -76,6 +87,7 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
     }
 
     private fun scheduleReconnect(delayMs: Long = 5_000L) {
+        if (intentionalDisconnect) return
         if (reconnectJob?.isActive == true) return
         reconnectJob = scope.launch {
             delay(delayMs)
