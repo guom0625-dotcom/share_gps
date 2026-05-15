@@ -40,6 +40,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -93,9 +94,10 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
     val loading          by vm.loading.collectAsState()
     val error            by vm.error.collectAsState()
     val avatars          by vm.avatars.collectAsState()
-    val historyMemberId  by vm.historyMemberId.collectAsState()
+    val historyMemberId   by vm.historyMemberId.collectAsState()
     val historyActiveDays by vm.historyActiveDays.collectAsState()
-    val historyPath      by vm.historyPath.collectAsState()
+    val historyDaysLoading by vm.historyDaysLoading.collectAsState()
+    val historyPath       by vm.historyPath.collectAsState()
 
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
@@ -153,6 +155,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
             when {
                 historyMemberId != null -> HistoryCalendar(
                     activeDays    = historyActiveDays,
+                    daysLoading   = historyDaysLoading,
                     onDaySelect   = { y, m, d -> vm.loadHistoryDate(historyMemberId!!, y, m, d) },
                     onMonthChange = { y, m -> vm.loadActiveDays(historyMemberId!!, y, m) },
                     modifier      = Modifier.fillMaxWidth(),
@@ -463,6 +466,7 @@ private fun FamilyMapView(
 @Composable
 private fun HistoryCalendar(
     activeDays:    Set<Int>,
+    daysLoading:   Boolean = false,
     onDaySelect:   (year: Int, month: Int, day: Int) -> Unit,
     onMonthChange: (year: Int, month: Int) -> Unit,
     modifier:      Modifier = Modifier,
@@ -485,6 +489,10 @@ private fun HistoryCalendar(
                 ym = ym.plusMonths(1)
                 onMonthChange(ym.year, ym.monthValue)
             }) { Icon(Icons.Default.ChevronRight, null, Modifier.size(20.dp)) }
+        }
+
+        if (daysLoading) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         }
 
         Row(Modifier.fillMaxWidth()) {
