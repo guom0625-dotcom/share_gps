@@ -204,7 +204,7 @@ class LocationService : Service() {
                         updateNotification()
                     }
                 }
-                delay(2 * 60_000L)
+                delay(10 * 60_000L)
             }
         }
     }
