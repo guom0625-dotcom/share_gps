@@ -122,6 +122,10 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
                         activeViewers.remove(viewerId)
                         if (activeViewers.isEmpty()) onActiveModeChanged?.invoke(false)
                     }
+                    "no_watchers" -> {
+                        activeViewers.clear()
+                        onActiveModeChanged?.invoke(false)
+                    }
                     "location_update" -> {
                         _locationUpdates.tryEmit(
                             LocationUpdateMsg(

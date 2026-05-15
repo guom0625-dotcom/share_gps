@@ -83,8 +83,13 @@ export function registerWsServer(app: FastifyInstance, db: Db): void {
                 sessions.addConnection(userId, socket);
                 send({ type: 'auth_ok', userId: user.id, role: user.role });
                 // Re-send current watchers (for FCM-woken reconnects)
-                for (const viewerId of sessions.getWatchersOf(userId)) {
-                    send({ type: 'watching', viewerUserId: viewerId });
+                const watchers = sessions.getWatchersOf(userId);
+                if (watchers.length > 0) {
+                    for (const viewerId of watchers) {
+                        send({ type: 'watching', viewerUserId: viewerId });
+                    }
+                } else {
+                    send({ type: 'no_watchers' });
                 }
                 return;
             }
@@ -124,6 +129,7 @@ export function registerWsServer(app: FastifyInstance, db: Db): void {
                     break;
                 }
                 case 'watch_stop':
+                    console.log(`[ws] watch_stop from ${userId} → ${msg.data.targetUserId}`);
                     sessions.watchStop(userId, msg.data.targetUserId);
                     break;
                 case 'ping':
