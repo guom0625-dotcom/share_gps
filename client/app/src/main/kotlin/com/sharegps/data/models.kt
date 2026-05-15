@@ -31,6 +31,14 @@ data class LocationUpdateMsg(
 )
 
 @Serializable
+data class HistoryPoint(
+    val lat: Double,
+    val lng: Double,
+    val accuracy: Double? = null,
+    val recordedAt: Long,
+)
+
+@Serializable
 data class ShareState(
     val mode: String,
     val precisionMode: String = "exact",

@@ -66,6 +66,27 @@ export function registerLocationRoutes(
         return { saved: points.length, rejected: 0 };
     });
 
+    app.get<{ Params: { userId: string }; Querystring: { year?: string; month?: string } }>(
+        '/locations/:userId/active-days',
+        { preHandler: [auth] },
+        async (req, reply) => {
+            if (req.user.role !== 'parent' && req.params.userId !== req.user.id) {
+                return reply.code(403).send({ error: 'not authorized' });
+            }
+            const y = parseInt(req.query.year  ?? String(new Date().getFullYear()), 10);
+            const m = parseInt(req.query.month ?? String(new Date().getMonth() + 1),  10);
+            const start = new Date(y, m - 1, 1).getTime();
+            const end   = new Date(y, m,     1).getTime();
+            const rows = db.prepare(`
+                SELECT DISTINCT
+                    CAST(strftime('%d', datetime(recorded_at / 1000, 'unixepoch', 'localtime')) AS INTEGER) AS day
+                FROM locations
+                WHERE user_id = ? AND recorded_at >= ? AND recorded_at < ?
+            `).all(req.params.userId, start, end) as { day: number }[];
+            return { days: rows.map(r => r.day) };
+        },
+    );
+
     app.get<{ Params: { userId: string }; Querystring: { from?: string; to?: string } }>(
         '/locations/:userId/history',
         { preHandler: [auth] },

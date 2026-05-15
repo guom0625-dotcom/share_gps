@@ -5,12 +5,17 @@ import android.os.Bundle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -19,7 +24,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Battery0Bar
@@ -30,9 +34,12 @@ import androidx.compose.material.icons.filled.Battery4Bar
 import androidx.compose.material.icons.filled.Battery5Bar
 import androidx.compose.material.icons.filled.Battery6Bar
 import androidx.compose.material.icons.filled.BatteryFull
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -50,9 +57,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -67,18 +77,24 @@ import com.naver.maps.map.NaverMap
 import com.naver.maps.map.overlay.CircleOverlay
 import com.naver.maps.map.overlay.Marker
 import com.naver.maps.map.overlay.OverlayImage
+import com.naver.maps.map.overlay.PolylineOverlay
 import com.sharegps.data.FamilyMember
+import com.sharegps.data.HistoryPoint
 import com.sharegps.data.LocationUpdateMsg
+import java.time.YearMonth
 import kotlinx.coroutines.delay
 
 @Composable
 fun HomeScreen(vm: HomeViewModel = viewModel()) {
-    val members   by vm.members.collectAsState()
-    val positions by vm.positions.collectAsState()
-    val selectedId by vm.selectedId.collectAsState()
-    val loading   by vm.loading.collectAsState()
-    val error     by vm.error.collectAsState()
-    val avatars   by vm.avatars.collectAsState()
+    val members          by vm.members.collectAsState()
+    val positions        by vm.positions.collectAsState()
+    val selectedId       by vm.selectedId.collectAsState()
+    val loading          by vm.loading.collectAsState()
+    val error            by vm.error.collectAsState()
+    val avatars          by vm.avatars.collectAsState()
+    val historyMemberId  by vm.historyMemberId.collectAsState()
+    val historyActiveDays by vm.historyActiveDays.collectAsState()
+    val historyPath      by vm.historyPath.collectAsState()
 
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
@@ -107,20 +123,39 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
                 .padding(horizontal = 16.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "가족 위치",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f),
-            )
-            TextButton(onClick = vm::load, enabled = !loading) { Text("새로고침") }
+            if (historyMemberId == null) {
+                Text(
+                    text = "가족 위치",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = vm::load, enabled = !loading) { Text("새로고침") }
+            } else {
+                val memberName = members.find { it.id == historyMemberId }?.name ?: ""
+                Text(
+                    text = "$memberName 이동 이력",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = vm::exitHistory) { Text("취소") }
+            }
         }
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 72.dp, max = 216.dp),
+                .then(
+                    if (historyMemberId == null) Modifier.heightIn(min = 72.dp, max = 216.dp)
+                    else Modifier
+                ),
         ) {
             when {
+                historyMemberId != null -> HistoryCalendar(
+                    activeDays    = historyActiveDays,
+                    onDaySelect   = { y, m, d -> vm.loadHistoryDate(historyMemberId!!, y, m, d) },
+                    onMonthChange = { y, m -> vm.loadActiveDays(historyMemberId!!, y, m) },
+                    modifier      = Modifier.fillMaxWidth(),
+                )
                 loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 members.isEmpty() -> Text(
                     "가족 구성원이 없습니다",
@@ -130,13 +165,14 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
                 else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(members, key = { it.id }) { member ->
                         MemberRow(
-                            member   = member,
-                            position = positions[member.id],
-                            selected = member.id == selectedId,
-                            isMe     = member.id == vm.myId,
-                            avatar   = avatars[member.id],
-                            now      = now,
-                            onClick  = { vm.selectMember(member.id) },
+                            member      = member,
+                            position    = positions[member.id],
+                            selected    = member.id == selectedId,
+                            isMe        = member.id == vm.myId,
+                            avatar      = avatars[member.id],
+                            now         = now,
+                            onClick     = { vm.selectMember(member.id) },
+                            onLongClick = { vm.enterHistory(member.id) },
                             onPickPhoto = {
                                 photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                             },
@@ -158,15 +194,17 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
         HorizontalDivider(thickness = 2.dp)
 
         FamilyMapView(
-            members    = members,
-            positions  = positions,
-            selectedId = selectedId,
-            avatars    = avatars,
-            modifier   = Modifier.weight(1f),
+            members     = members,
+            positions   = positions,
+            selectedId  = selectedId,
+            avatars     = avatars,
+            historyPath = historyPath,
+            modifier    = Modifier.weight(1f),
         )
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MemberRow(
     member:      FamilyMember,
@@ -176,13 +214,14 @@ private fun MemberRow(
     avatar:      Bitmap?,
     now:         Long,
     onClick:     () -> Unit,
+    onLongClick: () -> Unit,
     onPickPhoto: () -> Unit,
 ) {
     val iconBmp = remember(avatar, member.name) {
         avatar ?: createInitialMarker(member.name, sizePx = 128)
     }
     ListItem(
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick),
         colors = ListItemDefaults.colors(
             containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer
                              else MaterialTheme.colorScheme.surface,
@@ -246,19 +285,21 @@ private fun MemberRow(
 
 @Composable
 private fun FamilyMapView(
-    members:    List<FamilyMember>,
-    positions:  Map<String, LocationUpdateMsg>,
-    selectedId: String?,
-    avatars:    Map<String, Bitmap>,
-    modifier:   Modifier = Modifier,
+    members:     List<FamilyMember>,
+    positions:   Map<String, LocationUpdateMsg>,
+    selectedId:  String?,
+    avatars:     Map<String, Bitmap>,
+    historyPath: List<HistoryPoint> = emptyList(),
+    modifier:    Modifier = Modifier,
 ) {
     val context   = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
 
-    val mapView = remember { MapView(context) }
+    val mapView  = remember { MapView(context) }
     var naverMap by remember { mutableStateOf<NaverMap?>(null) }
     val markers  = remember { mutableMapOf<String, Marker>() }
     val circles  = remember { mutableMapOf<String, CircleOverlay>() }
+    val polyline = remember { PolylineOverlay() }
 
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
@@ -268,6 +309,7 @@ private fun FamilyMapView(
                 Lifecycle.Event.ON_PAUSE   -> mapView.onPause()
                 Lifecycle.Event.ON_STOP    -> mapView.onStop()
                 Lifecycle.Event.ON_DESTROY -> {
+                    polyline.map = null
                     circles.values.forEach { it.map = null }
                     circles.clear()
                     markers.values.forEach { it.map = null }
@@ -279,6 +321,24 @@ private fun FamilyMapView(
         }
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(historyPath, naverMap) {
+        val map = naverMap ?: return@LaunchedEffect
+        if (historyPath.isEmpty()) {
+            polyline.map = null
+        } else {
+            val coords = historyPath.map { LatLng(it.lat, it.lng) }
+            polyline.coords = coords
+            polyline.color  = 0xCC1E88E5.toInt()
+            polyline.width  = 10
+            if (polyline.map == null) polyline.map = map
+            val bounds = if (coords.size == 1)
+                LatLngBounds(coords.first(), coords.first())
+            else
+                LatLngBounds.Builder().include(coords).build()
+            map.moveCamera(CameraUpdate.fitBounds(bounds, 100))
+        }
     }
 
     LaunchedEffect(positions, naverMap, avatars) {
@@ -351,6 +411,96 @@ private fun FamilyMapView(
         },
         modifier = modifier,
     )
+}
+
+@Composable
+private fun HistoryCalendar(
+    activeDays:    Set<Int>,
+    onDaySelect:   (year: Int, month: Int, day: Int) -> Unit,
+    onMonthChange: (year: Int, month: Int) -> Unit,
+    modifier:      Modifier = Modifier,
+) {
+    var ym by remember { mutableStateOf(YearMonth.now()) }
+    var selectedDay by remember(ym) { mutableStateOf<Int?>(null) }
+
+    Column(modifier = modifier.padding(horizontal = 4.dp, vertical = 4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            IconButton(onClick = {
+                ym = ym.minusMonths(1)
+                onMonthChange(ym.year, ym.monthValue)
+            }) { Icon(Icons.Default.ChevronLeft, null, Modifier.size(20.dp)) }
+            Text("${ym.year}년 ${ym.monthValue}월", style = MaterialTheme.typography.bodyMedium)
+            IconButton(onClick = {
+                ym = ym.plusMonths(1)
+                onMonthChange(ym.year, ym.monthValue)
+            }) { Icon(Icons.Default.ChevronRight, null, Modifier.size(20.dp)) }
+        }
+
+        Row(Modifier.fillMaxWidth()) {
+            listOf("일", "월", "화", "수", "목", "금", "토").forEach { label ->
+                Text(
+                    text = label,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        val firstDow = ym.atDay(1).dayOfWeek.value % 7  // 0=Sun
+        val lastDay  = ym.lengthOfMonth()
+        val rows     = (firstDow + lastDay + 6) / 7
+
+        repeat(rows) { row ->
+            Row(Modifier.fillMaxWidth()) {
+                repeat(7) { col ->
+                    val day = row * 7 + col - firstDow + 1
+                    Box(
+                        modifier = Modifier.weight(1f).aspectRatio(1f),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (day in 1..lastDay) {
+                            val hasData    = day in activeDays
+                            val isSelected = day == selectedDay
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (isSelected) MaterialTheme.colorScheme.primary
+                                        else Color.Transparent
+                                    )
+                                    .then(
+                                        if (hasData) Modifier.clickable {
+                                            selectedDay = day
+                                            onDaySelect(ym.year, ym.monthValue, day)
+                                        } else Modifier
+                                    ),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = "$day",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontWeight = if (hasData) FontWeight.Bold else FontWeight.Normal,
+                                    ),
+                                    color = when {
+                                        isSelected -> MaterialTheme.colorScheme.onPrimary
+                                        hasData    -> MaterialTheme.colorScheme.onSurface
+                                        else       -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 private fun relativeTime(ts: Long, now: Long = System.currentTimeMillis()): String {
