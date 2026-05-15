@@ -51,6 +51,7 @@ import com.naver.maps.geometry.LatLngBounds
 import com.naver.maps.map.CameraUpdate
 import com.naver.maps.map.MapView
 import com.naver.maps.map.NaverMap
+import com.naver.maps.map.overlay.CircleOverlay
 import com.naver.maps.map.overlay.Marker
 import com.naver.maps.map.overlay.OverlayImage
 import com.sharegps.data.FamilyMember
@@ -205,6 +206,7 @@ private fun FamilyMapView(
     val mapView = remember { MapView(context) }
     var naverMap by remember { mutableStateOf<NaverMap?>(null) }
     val markers  = remember { mutableMapOf<String, Marker>() }
+    val circles  = remember { mutableMapOf<String, CircleOverlay>() }
 
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
@@ -214,6 +216,8 @@ private fun FamilyMapView(
                 Lifecycle.Event.ON_PAUSE   -> mapView.onPause()
                 Lifecycle.Event.ON_STOP    -> mapView.onStop()
                 Lifecycle.Event.ON_DESTROY -> {
+                    circles.values.forEach { it.map = null }
+                    circles.clear()
                     markers.values.forEach { it.map = null }
                     markers.clear()
                     mapView.onDestroy()
@@ -229,8 +233,27 @@ private fun FamilyMapView(
         val map = naverMap ?: return@LaunchedEffect
         for ((userId, pos) in positions) {
             val member = members.find { it.id == userId } ?: continue
+            val latlng = LatLng(pos.lat, pos.lng)
+
+            // accuracy circle — shown only when accuracy > 0
+            val acc = pos.accuracy
+            if (acc != null && acc > 0.0) {
+                val circle = circles.getOrPut(userId) {
+                    CircleOverlay().apply {
+                        color = 0x28448BFF.toInt()        // ~16% opacity blue fill
+                        outlineColor = 0xA0448BFF.toInt() // ~63% opacity blue border
+                        outlineWidth = 3
+                    }
+                }
+                circle.center = latlng
+                circle.radius = acc
+                if (circle.map == null) circle.map = map
+            } else {
+                circles.remove(userId)?.map = null
+            }
+
             val marker = markers.getOrPut(userId) { Marker() }
-            marker.position = LatLng(pos.lat, pos.lng)
+            marker.position = latlng
             marker.captionText = member.name
 
             val avatarBmp = avatars[userId]
