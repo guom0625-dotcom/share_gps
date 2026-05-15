@@ -63,6 +63,9 @@ fun PermissionGate(content: @Composable () -> Unit) {
                 Manifest.permission.ACCESS_FINE_LOCATION,
                 Manifest.permission.ACCESS_COARSE_LOCATION,
             )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                perms.add(Manifest.permission.ACTIVITY_RECOGNITION)
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 perms.add(Manifest.permission.POST_NOTIFICATIONS)
             }

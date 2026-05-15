@@ -4,12 +4,14 @@ import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.BatteryManager
+import android.os.Build
 import android.os.IBinder
 import android.os.Looper
 import androidx.core.app.ActivityCompat
@@ -19,6 +21,10 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import com.google.android.gms.location.ActivityRecognition
+import com.google.android.gms.location.ActivityTransition
+import com.google.android.gms.location.ActivityTransitionRequest
+import com.google.android.gms.location.DetectedActivity
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -61,6 +67,7 @@ class LocationService : Service() {
     private lateinit var dao: LocationQueueDao
     private lateinit var apiClient: ApiClient
     private var wsClient: WebSocketClient? = null
+    private var transitionPendingIntent: PendingIntent? = null
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -90,6 +97,7 @@ class LocationService : Service() {
         }
 
         ProcessLifecycleOwner.get().lifecycle.addObserver(fgObserver)
+        registerActivityTransitions()
 
         ServiceCompat.startForeground(
             this, NOTIF_ID, buildNotification(),
@@ -97,6 +105,33 @@ class LocationService : Service() {
         )
         requestLocationUpdates(false)
         startUploadLoop()
+        scope.launch {
+            MotionState.isStill.collect { restartLocationUpdates(activeMode) }
+        }
+    }
+
+    private fun registerActivityTransitions() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION)
+            != PackageManager.PERMISSION_GRANTED) return
+
+        val transitions = listOf(
+            ActivityTransition.Builder()
+                .setActivityType(DetectedActivity.STILL)
+                .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
+                .build(),
+            ActivityTransition.Builder()
+                .setActivityType(DetectedActivity.STILL)
+                .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_EXIT)
+                .build(),
+        )
+        val intent = Intent(this, ActivityTransitionReceiver::class.java)
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
+        val pi = PendingIntent.getBroadcast(this, 0, intent, flags)
+        transitionPendingIntent = pi
+        ActivityRecognition.getClient(this)
+            .requestActivityTransitionUpdates(ActivityTransitionRequest(transitions), pi)
     }
 
     private fun getBattery(): Int? =
@@ -145,6 +180,8 @@ class LocationService : Service() {
     @Synchronized
     private fun restartLocationUpdates(active: Boolean) {
         locationCallback?.let { fusedClient.removeLocationUpdates(it) }
+        locationCallback = null
+        if (!active && MotionState.isStill.value) return
         requestLocationUpdates(active)
     }
 
@@ -174,6 +211,9 @@ class LocationService : Service() {
     override fun onDestroy() {
         ProcessLifecycleOwner.get().lifecycle.removeObserver(fgObserver)
         locationCallback?.let { fusedClient.removeLocationUpdates(it) }
+        transitionPendingIntent?.let {
+            ActivityRecognition.getClient(this).removeActivityTransitionUpdates(it)
+        }
         wsClient?.onActiveModeChanged = null
         scope.cancel()
         super.onDestroy()
