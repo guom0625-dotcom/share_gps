@@ -35,6 +35,10 @@ android {
             "String", "NAVER_MAPS_CLIENT_ID",
             "\"${localOrEnv("NAVER_MAPS_CLIENT_ID")}\""
         )
+        buildConfigField(
+            "String", "LOCAL_SERVER_URL",
+            "\"${localOrEnv("LOCAL_SERVER_URL")}\""
+        )
     }
 
     signingConfigs {
@@ -115,4 +119,5 @@ dependencies {
 
     // ViewModel Compose
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-process:2.8.7")
 }

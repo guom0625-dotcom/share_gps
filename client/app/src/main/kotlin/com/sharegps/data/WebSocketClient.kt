@@ -29,7 +29,7 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
             instance?.let { return it }
             val key = KeyStore(context).getKey() ?: return null
             return synchronized(this) {
-                instance ?: WebSocketClient(BuildConfig.SERVER_URL, key).also { instance = it }
+                instance ?: WebSocketClient(resolveServerUrl(context), key).also { instance = it }
             }
         }
     }

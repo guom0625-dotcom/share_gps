@@ -21,7 +21,6 @@ import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
-import com.sharegps.BuildConfig
 import com.sharegps.R
 import com.sharegps.data.ApiClient
 import com.sharegps.data.AppDatabase
@@ -29,6 +28,7 @@ import com.sharegps.data.KeyStore
 import com.sharegps.data.LocationQueueDao
 import com.sharegps.data.LocationQueueEntity
 import com.sharegps.data.WebSocketClient
+import com.sharegps.data.resolveServerUrl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -67,7 +67,7 @@ class LocationService : Service() {
 
         val key = KeyStore(this).getKey() ?: run { stopSelf(); return }
         dao = AppDatabase.get(this).locationQueueDao()
-        apiClient = ApiClient(BuildConfig.SERVER_URL, key)
+        apiClient = ApiClient(resolveServerUrl(this), key)
 
         wsClient = WebSocketClient.get(this)?.also { ws ->
             ws.onActiveModeChanged = { active ->
