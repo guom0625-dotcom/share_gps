@@ -99,12 +99,10 @@ class LocationService : Service() {
                 if (active != activeMode) {
                     activeMode = active
                     restartLocationUpdates(active)
-                    if (!active && !isForeground) stopAndExit()
+                    if (!active) stopAndExit()
                 }
             }
-            ws.onNoWatchers = {
-                if (!isForeground) stopAndExit()
-            }
+            ws.onNoWatchers = { stopAndExit() }
             if (!ws.isConnected) ws.connect()
         }
 
