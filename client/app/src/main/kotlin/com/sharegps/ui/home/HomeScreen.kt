@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
@@ -45,44 +47,54 @@ import com.sharegps.data.LocationUpdateMsg
 
 @Composable
 fun HomeScreen(vm: HomeViewModel = viewModel()) {
-    val members  by vm.members.collectAsState()
+    val members   by vm.members.collectAsState()
     val positions by vm.positions.collectAsState()
     val selectedId by vm.selectedId.collectAsState()
-    val loading  by vm.loading.collectAsState()
-    val error    by vm.error.collectAsState()
+    val loading   by vm.loading.collectAsState()
+    val error     by vm.error.collectAsState()
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // 위쪽 절반: 가족 리스트
-        Column(modifier = Modifier.weight(1f)) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "가족 위치",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+    ) {
+        // 헤더
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "가족 위치",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = vm::load, enabled = !loading) { Text("새로고침") }
+        }
+
+        // 가족 리스트 — 3명 분량 고정 높이, 스크롤 가능
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 72.dp, max = 216.dp),
+        ) {
+            when {
+                loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                members.isEmpty() -> Text(
+                    "가족 구성원이 없습니다",
+                    modifier = Modifier.align(Alignment.Center),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                TextButton(onClick = vm::load, enabled = !loading) { Text("새로고침") }
-            }
-            Box(modifier = Modifier.weight(1f)) {
-                when {
-                    loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                    members.isEmpty() -> Text(
-                        "가족 구성원이 없습니다",
-                        modifier = Modifier.align(Alignment.Center),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        items(members, key = { it.id }) { member ->
-                            MemberRow(
-                                member   = member,
-                                position = positions[member.id],
-                                selected = member.id == selectedId,
-                                onClick  = { vm.selectMember(member.id) },
-                            )
-                            HorizontalDivider(modifier = Modifier.fillMaxWidth())
-                        }
+                else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    items(members, key = { it.id }) { member ->
+                        MemberRow(
+                            member   = member,
+                            position = positions[member.id],
+                            selected = member.id == selectedId,
+                            onClick  = { vm.selectMember(member.id) },
+                        )
+                        HorizontalDivider(modifier = Modifier.fillMaxWidth())
                     }
                 }
             }
@@ -98,7 +110,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
 
         HorizontalDivider(thickness = 2.dp)
 
-        // 아래쪽 절반: 지도
+        // 지도 — 남은 공간 전체
         FamilyMapView(
             members    = members,
             positions  = positions,
@@ -163,7 +175,6 @@ private fun FamilyMapView(
         onDispose { lifecycle.removeObserver(observer) }
     }
 
-    // 위치가 바뀔 때마다 마커 업데이트
     LaunchedEffect(positions, naverMap) {
         val map = naverMap ?: return@LaunchedEffect
         for ((userId, pos) in positions) {
@@ -176,11 +187,10 @@ private fun FamilyMapView(
         }
     }
 
-    // 처음 위치 데이터가 들어오면 모든 마커가 보이도록 카메라 맞춤
     LaunchedEffect(positions.isNotEmpty(), naverMap) {
         val map = naverMap ?: return@LaunchedEffect
         if (positions.isEmpty()) return@LaunchedEffect
-        if (selectedId != null) return@LaunchedEffect  // 선택된 멤버 있으면 건드리지 않음
+        if (selectedId != null) return@LaunchedEffect
         val latlngs = positions.values.map { LatLng(it.lat, it.lng) }
         if (latlngs.size == 1) {
             map.moveCamera(CameraUpdate.scrollAndZoomTo(latlngs.first(), 14.0))
@@ -190,7 +200,6 @@ private fun FamilyMapView(
         }
     }
 
-    // 선택된 멤버의 위치가 바뀔 때마다 카메라 추적
     val selectedPos = selectedId?.let { positions[it] }
     LaunchedEffect(selectedPos, naverMap) {
         val map = naverMap ?: return@LaunchedEffect
