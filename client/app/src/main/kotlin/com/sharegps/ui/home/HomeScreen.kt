@@ -302,9 +302,10 @@ private fun FamilyMapView(
     val context   = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
 
-    val mapView     = remember { MapView(context) }
-    var naverMap   by remember { mutableStateOf<NaverMap?>(null) }
-    val markers     = remember { mutableMapOf<String, Marker>() }
+    val mapView       = remember { MapView(context) }
+    var naverMap     by remember { mutableStateOf<NaverMap?>(null) }
+    var lastTrackedId by remember { mutableStateOf<String?>(null) }
+    val markers       = remember { mutableMapOf<String, Marker>() }
     val circles     = remember { mutableMapOf<String, CircleOverlay>() }
     val polyline    = remember { PolylineOverlay() }
     val timeMarkers = remember { mutableMapOf<Int, Marker>() }
@@ -453,8 +454,15 @@ private fun FamilyMapView(
     val selectedPos = selectedId?.let { positions[it] }
     LaunchedEffect(selectedPos, naverMap) {
         val map = naverMap ?: return@LaunchedEffect
-        val pos = selectedPos ?: return@LaunchedEffect
-        map.moveCamera(CameraUpdate.scrollAndZoomTo(LatLng(pos.lat, pos.lng), 15.0))
+        if (selectedPos == null) { lastTrackedId = null; return@LaunchedEffect }
+        val isNewSelection = selectedId != lastTrackedId
+        lastTrackedId = selectedId
+        val target = LatLng(selectedPos.lat, selectedPos.lng)
+        if (isNewSelection) {
+            map.animateCamera(CameraUpdate.scrollAndZoomTo(target, 15.0))
+        } else {
+            map.animateCamera(CameraUpdate.scrollTo(target))
+        }
     }
 
     AndroidView(

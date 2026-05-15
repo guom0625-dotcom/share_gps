@@ -78,11 +78,20 @@ class LocationService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Volatile private var activeMode = false
+    @Volatile private var isForeground = false
     private var locationCallback: LocationCallback? = null
     private var lastUploadAt: Long = 0
 
     private val fgObserver = object : DefaultLifecycleObserver {
-        override fun onStart(owner: LifecycleOwner) = requestFreshFix()
+        override fun onStart(owner: LifecycleOwner) {
+            isForeground = true
+            requestFreshFix()
+            restartLocationUpdates(activeMode)
+        }
+        override fun onStop(owner: LifecycleOwner) {
+            isForeground = false
+            restartLocationUpdates(activeMode)
+        }
     }
 
     override fun onCreate() {
@@ -204,7 +213,7 @@ class LocationService : Service() {
     private fun restartLocationUpdates(active: Boolean) {
         locationCallback?.let { fusedClient.removeLocationUpdates(it) }
         locationCallback = null
-        if (!active && MotionState.isStill.value) return
+        if (!active && !isForeground && MotionState.isStill.value) return
         requestLocationUpdates(active)
         updateNotification()
     }
@@ -213,11 +222,12 @@ class LocationService : Service() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
             != PackageManager.PERMISSION_GRANTED) return
 
+        val highAccuracy = active || isForeground
         val req = LocationRequest.Builder(
-            if (active) Priority.PRIORITY_HIGH_ACCURACY else Priority.PRIORITY_BALANCED_POWER_ACCURACY,
-            if (active) 5_000L else 600_000L,
+            if (highAccuracy) Priority.PRIORITY_HIGH_ACCURACY else Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+            if (highAccuracy) 5_000L else 600_000L,
         ).apply {
-            if (!active) setMinUpdateDistanceMeters(30f)
+            if (!highAccuracy) setMinUpdateDistanceMeters(30f)
         }.build()
 
         val cb = object : LocationCallback() {
@@ -254,9 +264,9 @@ class LocationService : Service() {
             NotificationChannel(NOTIF_CHANNEL, "위치 공유", NotificationManager.IMPORTANCE_LOW)
         )
         val status = when {
-            MotionState.isStill.value -> "정지 감지 — GPS 일시 중단"
-            activeMode                -> "실시간 공유 중"
-            else                      -> "위치 공유 중"
+            activeMode || isForeground -> "실시간 공유 중"
+            MotionState.isStill.value  -> "정지 감지 — GPS 일시 중단"
+            else                       -> "위치 공유 중"
         }
         val uploadText = if (lastUploadAt > 0) {
             val ldt = LocalDateTime.ofInstant(Instant.ofEpochMilli(lastUploadAt), ZoneId.systemDefault())
