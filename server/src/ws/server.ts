@@ -35,6 +35,10 @@ export function registerWsServer(app: FastifyInstance, db: Db): void {
             recorded_at = excluded.recorded_at
         WHERE excluded.recorded_at > current_location.recorded_at
     `);
+    const insertLoc = db.prepare(`
+        INSERT OR IGNORE INTO locations (user_id, lat, lng, accuracy, activity, battery, recorded_at, received_at)
+        VALUES (?, ?, ?, ?, NULL, ?, ?, ?)
+    `);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (app as any).get('/ws', { websocket: true }, (socket: WebSocket) => {
@@ -85,7 +89,11 @@ export function registerWsServer(app: FastifyInstance, db: Db): void {
             switch (msg.data.type) {
                 case 'location': {
                     const { lat, lng, accuracy, battery, recordedAt } = msg.data;
-                    upsertCurrent.run(userId, lat, lng, accuracy ?? null, battery ?? null, recordedAt);
+                    const receivedAt = Date.now();
+                    db.transaction(() => {
+                        upsertCurrent.run(userId, lat, lng, accuracy ?? null, battery ?? null, recordedAt);
+                        insertLoc.run(userId, lat, lng, accuracy ?? null, battery ?? null, recordedAt, receivedAt);
+                    })();
                     sessions.broadcastToWatchers(userId, {
                         type: 'location_update',
                         userId, lat, lng,

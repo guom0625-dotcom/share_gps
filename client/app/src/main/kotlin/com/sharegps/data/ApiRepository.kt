@@ -3,7 +3,9 @@ package com.sharegps.data
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.HttpResponseValidator
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.ResponseException
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
@@ -11,6 +13,7 @@ import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
@@ -21,6 +24,14 @@ class ApiRepository(private val serverUrl: String, private val apiKey: String) {
     private val http = HttpClient(OkHttp) {
         install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
         install(HttpTimeout) { requestTimeoutMillis = 10_000 }
+        install(HttpResponseValidator) {
+            validateResponse { response ->
+                if (response.status == HttpStatusCode.Unauthorized) {
+                    AuthEvent.needsReEnroll.tryEmit(Unit)
+                    throw ResponseException(response, "Unauthorized")
+                }
+            }
+        }
     }
 
     suspend fun family(): List<FamilyMember> =
@@ -30,7 +41,7 @@ class ApiRepository(private val serverUrl: String, private val apiKey: String) {
         http.get("$serverUrl/me") { bearerAuth(apiKey) }.body()
 
     suspend fun avatarBytes(userId: String): ByteArray? = try {
-        val res = http.get("$serverUrl/users/$userId/avatar")
+        val res = http.get("$serverUrl/users/$userId/avatar") { bearerAuth(apiKey) }
         if (res.status.isSuccess()) res.body<ByteArray>() else null
     } catch (_: Exception) { null }
 

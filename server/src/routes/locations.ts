@@ -25,7 +25,7 @@ export function registerLocationRoutes(
         'SELECT mode FROM share_state WHERE user_id = ?',
     );
     const insertLoc = db.prepare(`
-        INSERT INTO locations (user_id, lat, lng, accuracy, activity, battery, recorded_at, received_at)
+        INSERT OR IGNORE INTO locations (user_id, lat, lng, accuracy, activity, battery, recorded_at, received_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const upsertCurrent = db.prepare(`

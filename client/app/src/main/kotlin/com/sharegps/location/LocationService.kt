@@ -34,6 +34,7 @@ import com.google.android.gms.location.Priority
 import com.sharegps.R
 import com.sharegps.data.ApiClient
 import com.sharegps.data.AppDatabase
+import com.sharegps.data.AuthEvent
 import com.sharegps.data.KeyStore
 import com.sharegps.data.LocationQueueDao
 import com.sharegps.data.LocationQueueEntity
@@ -107,6 +108,9 @@ class LocationService : Service() {
         startUploadLoop()
         scope.launch {
             MotionState.isStill.collect { restartLocationUpdates(activeMode) }
+        }
+        scope.launch {
+            AuthEvent.needsReEnroll.collect { stopSelf() }
         }
     }
 

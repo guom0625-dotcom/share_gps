@@ -8,6 +8,7 @@ import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
@@ -34,6 +35,9 @@ class ApiClient(private val serverUrl: String, private val apiKey: String) {
             bearerAuth(apiKey)
             contentType(ContentType.Application.Json)
             setBody(rows.map { LocationPayload(it.lat, it.lng, it.accuracy, it.battery, it.timestamp) })
+        }
+        if (response.status == HttpStatusCode.Unauthorized) {
+            AuthEvent.needsReEnroll.tryEmit(Unit)
         }
         response.status.isSuccess()
     } catch (_: Exception) {

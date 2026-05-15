@@ -32,7 +32,7 @@ export function registerAvatarRoutes(
         return { ok: true };
     });
 
-    app.get('/users/:userId/avatar', async (req, reply) => {
+    app.get('/users/:userId/avatar', { preHandler: [auth] }, async (req, reply) => {
         const { userId } = req.params as { userId: string };
         const path = avatarPath(userId);
         if (!existsSync(path)) return reply.code(404).send();

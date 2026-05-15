@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.sharegps.data.AuthEvent
 import com.sharegps.data.KeyStore
 import com.sharegps.location.LocationService
 import com.sharegps.ui.enroll.EnrollScreen
@@ -68,6 +69,14 @@ class MainActivity : ComponentActivity() {
 
                     val nav   = rememberNavController()
                     val start = if (keyStore.hasKey()) "home" else "enroll"
+                    LaunchedEffect(Unit) {
+                        AuthEvent.needsReEnroll.collect {
+                            keyStore.clearKey()
+                            nav.navigate("enroll") {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        }
+                    }
                     NavHost(navController = nav, startDestination = start) {
                         composable("enroll") {
                             EnrollScreen(keyStore) {
