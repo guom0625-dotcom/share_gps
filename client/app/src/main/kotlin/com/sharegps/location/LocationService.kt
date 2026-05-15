@@ -123,17 +123,18 @@ class LocationService : Service() {
             override fun onLocationResult(result: LocationResult) {
                 val loc = result.lastLocation ?: return
                 scope.launch {
+                    val battery = (getSystemService(BATTERY_SERVICE) as BatteryManager)
+                        .getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                        .takeIf { it >= 0 }
                     dao.insert(
                         LocationQueueEntity(
                             lat = loc.latitude,
                             lng = loc.longitude,
                             accuracy = loc.accuracy,
+                            battery = battery,
                             timestamp = loc.time,
                         )
                     )
-                    val battery = (getSystemService(BATTERY_SERVICE) as BatteryManager)
-                        .getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
-                        .takeIf { it >= 0 }
                     val batteryField = if (battery != null) ""","battery":$battery""" else ""
                     wsClient?.sendRaw(
                         """{"type":"location","lat":${loc.latitude},"lng":${loc.longitude},"accuracy":${loc.accuracy},"recordedAt":${loc.time}$batteryField}"""

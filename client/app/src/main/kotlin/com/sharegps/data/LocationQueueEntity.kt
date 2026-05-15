@@ -9,5 +9,6 @@ data class LocationQueueEntity(
     val lat: Double,
     val lng: Double,
     val accuracy: Float,
+    val battery: Int? = null,
     val timestamp: Long,
 )

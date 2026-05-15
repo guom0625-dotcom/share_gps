@@ -19,6 +19,7 @@ private data class LocationPayload(
     val lat: Double,
     val lng: Double,
     val accuracy: Float,
+    val battery: Int? = null,
     val recordedAt: Long,
 )
 
@@ -32,7 +33,7 @@ class ApiClient(private val serverUrl: String, private val apiKey: String) {
         val response = http.post("$serverUrl/locations/batch") {
             bearerAuth(apiKey)
             contentType(ContentType.Application.Json)
-            setBody(rows.map { LocationPayload(it.lat, it.lng, it.accuracy, it.timestamp) })
+            setBody(rows.map { LocationPayload(it.lat, it.lng, it.accuracy, it.battery, it.timestamp) })
         }
         response.status.isSuccess()
     } catch (_: Exception) {

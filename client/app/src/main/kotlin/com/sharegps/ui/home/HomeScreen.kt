@@ -198,8 +198,17 @@ private fun MemberRow(
         supportingContent = {
             val role = if (member.role == "parent") "부모" else "자녀"
             val time = position?.let { relativeTime(it.recordedAt, now) } ?: "위치 없음"
-            val batt = position?.battery?.let { " · 배터리 $it%" } ?: ""
-            Text("$role · $time$batt")
+            Text("$role · $time")
+        },
+        trailingContent = position?.battery?.let { batt ->
+            {
+                Text(
+                    text = "$batt%",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (batt <= 20) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         },
     )
 }
