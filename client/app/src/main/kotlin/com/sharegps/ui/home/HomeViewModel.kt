@@ -62,7 +62,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val appLifecycleObserver = object : DefaultLifecycleObserver {
         override fun onStop(owner: LifecycleOwner) = stopWatching()
         override fun onStart(owner: LifecycleOwner) {
-            if (_members.value.isNotEmpty()) startWatching(_members.value)
+            if (_members.value.isNotEmpty()) {
+                refresh()
+                startWatching(_members.value)
+            }
         }
     }
 
@@ -97,6 +100,20 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 loadAvatars(members)
             }.onFailure { _error.value = it.message }
             _loading.value = false
+        }
+    }
+
+    private fun refresh() {
+        viewModelScope.launch {
+            runCatching { repo.family() }.onSuccess { members ->
+                _members.value = members.sortedByDescending { it.id == myId }
+                val updated = members.mapNotNull { m ->
+                    m.current?.let { loc ->
+                        m.id to LocationUpdateMsg(m.id, loc.lat, loc.lng, loc.accuracy, loc.battery, loc.recordedAt)
+                    }
+                }.toMap()
+                _positions.update { it + updated }
+            }
         }
     }
 
