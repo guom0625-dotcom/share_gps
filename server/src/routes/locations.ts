@@ -104,11 +104,13 @@ export function registerLocationRoutes(
             // Clamp to 30-day window
             const clampedFrom = Math.max(from, to - THIRTY_DAYS_MS);
 
+            const BUCKET_MS = 30 * 60 * 1000; // 30분
             const rows = db.prepare(`
-                SELECT lat, lng, accuracy, recorded_at AS recordedAt
+                SELECT lat, lng, accuracy, MIN(recorded_at) AS recordedAt
                 FROM locations
                 WHERE user_id = ? AND recorded_at BETWEEN ? AND ?
-                ORDER BY recorded_at ASC
+                GROUP BY recorded_at / ${BUCKET_MS}
+                ORDER BY recordedAt ASC
             `).all(req.params.userId, clampedFrom, to);
 
             return rows;
