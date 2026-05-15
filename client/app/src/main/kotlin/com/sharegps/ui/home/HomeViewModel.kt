@@ -86,7 +86,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 myId = repo.me().id
                 repo.family()
             }.onSuccess { members ->
-                _members.value = members
+                _members.value = members.sortedByDescending { it.id == myId }
                 val initial = members.mapNotNull { m ->
                     m.current?.let { loc ->
                         m.id to LocationUpdateMsg(m.id, loc.lat, loc.lng, loc.accuracy, loc.battery, loc.recordedAt)

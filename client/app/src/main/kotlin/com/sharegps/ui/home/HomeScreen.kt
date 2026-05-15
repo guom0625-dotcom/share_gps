@@ -141,7 +141,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(onClick = vm::exitHistory) { Text("취소") }
+                TextButton(onClick = vm::exitHistory) { Text("돌아가기") }
             }
         }
 
@@ -204,6 +204,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
             selectedId  = selectedId,
             avatars     = avatars,
             historyPath = historyPath,
+            myId        = vm.myId,
             modifier    = Modifier.weight(1f),
         )
     }
@@ -249,7 +250,7 @@ private fun MemberRow(
                     ),
             )
         },
-        headlineContent = { Text(member.name) },
+        headlineContent = { Text(if (isMe) "나" else member.name) },
         supportingContent = {
             val time = position?.let { relativeTime(it.recordedAt, now) } ?: "위치 없음"
             Text(time)
@@ -295,6 +296,7 @@ private fun FamilyMapView(
     selectedId:  String?,
     avatars:     Map<String, Bitmap>,
     historyPath: List<HistoryPoint> = emptyList(),
+    myId:        String? = null,
     modifier:    Modifier = Modifier,
 ) {
     val context   = LocalContext.current
@@ -410,7 +412,7 @@ private fun FamilyMapView(
 
             val marker = markers.getOrPut(userId) { Marker() }
             marker.position = latlng
-            marker.captionText = member.name
+            marker.captionText = if (userId == myId) "나" else member.name
             marker.subCaptionText = speedLabel(pos.speed)
             marker.subCaptionTextSize = 10f
             marker.subCaptionColor = 0xFF424242.toInt()

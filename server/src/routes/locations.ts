@@ -104,7 +104,7 @@ export function registerLocationRoutes(
             // Clamp to 30-day window
             const clampedFrom = Math.max(from, to - THIRTY_DAYS_MS);
 
-            const BUCKET_MS = 30 * 60 * 1000; // 30분
+            const BUCKET_MS = 5 * 60 * 1000; // 5분
             const rows = db.prepare(`
                 SELECT lat, lng, accuracy, MIN(recorded_at) AS recordedAt
                 FROM locations
