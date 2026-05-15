@@ -2,6 +2,9 @@ package com.sharegps.ui.home
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.viewModelScope
 import com.sharegps.BuildConfig
 import com.sharegps.data.ApiRepository
@@ -32,7 +35,17 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
-    init { load() }
+    private val appLifecycleObserver = object : DefaultLifecycleObserver {
+        override fun onStop(owner: LifecycleOwner) = stopWatching()
+        override fun onStart(owner: LifecycleOwner) {
+            if (_members.value.isNotEmpty()) startWatching(_members.value)
+        }
+    }
+
+    init {
+        ProcessLifecycleOwner.get().lifecycle.addObserver(appLifecycleObserver)
+        load()
+    }
 
     fun load() {
         viewModelScope.launch {
@@ -41,14 +54,13 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             runCatching { repo.family() }
                 .onSuccess { members ->
                     _members.value = members
-                    // REST에서 받은 마지막 위치로 초기값 세팅
                     val initial = members.mapNotNull { m ->
                         m.current?.let { loc ->
                             m.id to LocationUpdateMsg(m.id, loc.lat, loc.lng, loc.accuracy, loc.recordedAt)
                         }
                     }.toMap()
                     _positions.update { it + initial }
-                    watchAll(members)
+                    startWatching(members)
                 }
                 .onFailure { _error.value = it.message }
             _loading.value = false
@@ -59,11 +71,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _selectedId.value = if (_selectedId.value == memberId) null else memberId
     }
 
-    private fun watchAll(members: List<FamilyMember>) {
+    private fun startWatching(members: List<FamilyMember>) {
         val ws = WebSocketClient.get(getApplication()) ?: return
-        for (member in members) {
-            ws.watchStart(member.id)
-        }
+        for (member in members) ws.watchStart(member.id)
         viewModelScope.launch {
             ws.locationUpdates.collect { msg ->
                 _positions.update { current -> current + (msg.userId to msg) }
@@ -71,11 +81,14 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private fun stopWatching() {
+        val ws = WebSocketClient.get(getApplication()) ?: return
+        for (member in _members.value) ws.watchStop(member.id)
+    }
+
     override fun onCleared() {
         super.onCleared()
-        val ws = WebSocketClient.get(getApplication()) ?: return
-        for (member in _members.value) {
-            ws.watchStop(member.id)
-        }
+        ProcessLifecycleOwner.get().lifecycle.removeObserver(appLifecycleObserver)
+        stopWatching()
     }
 }

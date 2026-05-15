@@ -113,7 +113,7 @@ class LocationService : Service() {
 
         val req = LocationRequest.Builder(
             if (active) Priority.PRIORITY_HIGH_ACCURACY else Priority.PRIORITY_BALANCED_POWER_ACCURACY,
-            if (active) 4_000L else 45_000L,
+            if (active) 5_000L else 600_000L,
         ).apply {
             if (!active) setMinUpdateDistanceMeters(30f)
         }.build()
