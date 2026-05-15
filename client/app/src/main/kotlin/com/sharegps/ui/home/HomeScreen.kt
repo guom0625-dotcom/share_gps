@@ -19,8 +19,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Battery0Bar
+import androidx.compose.material.icons.filled.Battery1Bar
+import androidx.compose.material.icons.filled.Battery2Bar
+import androidx.compose.material.icons.filled.Battery3Bar
+import androidx.compose.material.icons.filled.Battery4Bar
+import androidx.compose.material.icons.filled.Battery5Bar
+import androidx.compose.material.icons.filled.Battery6Bar
+import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -196,18 +207,38 @@ private fun MemberRow(
         },
         headlineContent = { Text(member.name) },
         supportingContent = {
-            val role = if (member.role == "parent") "부모" else "자녀"
             val time = position?.let { relativeTime(it.recordedAt, now) } ?: "위치 없음"
-            Text("$role · $time")
+            Text(time)
         },
         trailingContent = position?.battery?.let { batt ->
             {
-                Text(
-                    text = "$batt%",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (batt <= 20) MaterialTheme.colorScheme.error
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                val tint = if (batt <= 20) MaterialTheme.colorScheme.error
+                           else MaterialTheme.colorScheme.onSurfaceVariant
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Icon(
+                        imageVector = when {
+                            batt >= 95 -> Icons.Default.BatteryFull
+                            batt >= 80 -> Icons.Default.Battery6Bar
+                            batt >= 65 -> Icons.Default.Battery5Bar
+                            batt >= 50 -> Icons.Default.Battery4Bar
+                            batt >= 35 -> Icons.Default.Battery3Bar
+                            batt >= 20 -> Icons.Default.Battery2Bar
+                            batt >= 10 -> Icons.Default.Battery1Bar
+                            else       -> Icons.Default.Battery0Bar
+                        },
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = tint,
+                    )
+                    Text(
+                        text = "$batt%",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = tint,
+                    )
+                }
             }
         },
     )

@@ -70,8 +70,8 @@ export function registerLocationRoutes(
         '/locations/:userId/history',
         { preHandler: [auth] },
         async (req, reply) => {
-            if (req.user.role !== 'parent') {
-                return reply.code(403).send({ error: 'parent role required' });
+            if (req.user.role !== 'parent' && req.params.userId !== req.user.id) {
+                return reply.code(403).send({ error: 'not authorized' });
             }
 
             const now = Date.now();
