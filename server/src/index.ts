@@ -37,6 +37,15 @@ registerWsServer(app, db);
 app.get('/health', async () => ({ ok: true, time: Date.now() }));
 app.get('/version', async () => ({ server: '0.1.0', minClient: '0.1.0' }));
 
+const deleteOldLocations = db.prepare('DELETE FROM locations WHERE recorded_at < ?');
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+const runCleanup = () => {
+    const { changes } = deleteOldLocations.run(Date.now() - THIRTY_DAYS_MS);
+    if (changes > 0) app.log.info({ changes }, 'pruned old location rows');
+};
+runCleanup();
+setInterval(runCleanup, 6 * 60 * 60 * 1000);
+
 const shutdown = async (signal: string) => {
     app.log.info({ signal }, 'shutting down');
     await app.close();
