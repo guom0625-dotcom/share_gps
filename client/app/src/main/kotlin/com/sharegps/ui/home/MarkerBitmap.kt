@@ -35,6 +35,34 @@ fun createInitialMarker(name: String, sizePx: Int = 96): Bitmap {
     return bmp
 }
 
+fun createTransitDot(sizePx: Int = 18): Bitmap {
+    val bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bmp)
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    val r = sizePx / 2f
+    paint.color = 0xFF1E88E5.toInt()
+    canvas.drawCircle(r, r, r, paint)
+    paint.color = Color.WHITE
+    paint.style = Paint.Style.STROKE
+    paint.strokeWidth = sizePx * 0.15f
+    canvas.drawCircle(r, r, r - paint.strokeWidth / 2, paint)
+    return bmp
+}
+
+fun createStayDot(sizePx: Int = 26): Bitmap {
+    val bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bmp)
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    val r = sizePx / 2f
+    paint.color = 0xFFFB8C00.toInt()   // amber
+    canvas.drawCircle(r, r, r, paint)
+    paint.color = Color.WHITE
+    paint.style = Paint.Style.STROKE
+    paint.strokeWidth = sizePx * 0.14f
+    canvas.drawCircle(r, r, r - paint.strokeWidth / 2, paint)
+    return bmp
+}
+
 fun createPhotoMarker(bytes: ByteArray, sizePx: Int = 96): Bitmap {
     val src = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
         ?: return createInitialMarker("?", sizePx)

@@ -77,6 +77,7 @@ import com.naver.maps.map.NaverMap
 import com.naver.maps.map.overlay.CircleOverlay
 import com.naver.maps.map.overlay.Marker
 import com.naver.maps.map.overlay.OverlayImage
+import com.naver.maps.map.overlay.Align
 import com.naver.maps.map.overlay.PolylineOverlay
 import com.sharegps.data.FamilyMember
 import com.sharegps.data.HistoryPoint
@@ -295,11 +296,17 @@ private fun FamilyMapView(
     val context   = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
 
-    val mapView  = remember { MapView(context) }
-    var naverMap by remember { mutableStateOf<NaverMap?>(null) }
-    val markers  = remember { mutableMapOf<String, Marker>() }
-    val circles  = remember { mutableMapOf<String, CircleOverlay>() }
-    val polyline = remember { PolylineOverlay() }
+    val mapView     = remember { MapView(context) }
+    var naverMap   by remember { mutableStateOf<NaverMap?>(null) }
+    val markers     = remember { mutableMapOf<String, Marker>() }
+    val circles     = remember { mutableMapOf<String, CircleOverlay>() }
+    val polyline    = remember { PolylineOverlay() }
+    val timeMarkers = remember { mutableMapOf<Int, Marker>() }
+    var currentZoom by remember { mutableStateOf(14.0) }
+    val transitDot  = remember { createTransitDot() }
+    val stayDot     = remember { createStayDot() }
+    val pathEvents  = remember(historyPath) { processHistoryPath(historyPath) }
+    val visibleEvents = remember(pathEvents, currentZoom) { filterByZoom(pathEvents, currentZoom) }
 
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
@@ -310,6 +317,8 @@ private fun FamilyMapView(
                 Lifecycle.Event.ON_STOP    -> mapView.onStop()
                 Lifecycle.Event.ON_DESTROY -> {
                     polyline.map = null
+                    timeMarkers.values.forEach { it.map = null }
+                    timeMarkers.clear()
                     circles.values.forEach { it.map = null }
                     circles.clear()
                     markers.values.forEach { it.map = null }
@@ -338,6 +347,44 @@ private fun FamilyMapView(
             else
                 LatLngBounds.Builder().include(coords).build()
             map.moveCamera(CameraUpdate.fitBounds(bounds, 100))
+        }
+    }
+
+    LaunchedEffect(naverMap) {
+        val map = naverMap ?: return@LaunchedEffect
+        map.addOnCameraIdleListener { currentZoom = map.cameraPosition.zoom }
+    }
+
+    LaunchedEffect(visibleEvents, naverMap) {
+        val map = naverMap ?: return@LaunchedEffect
+        timeMarkers.values.forEach { it.map = null }
+        timeMarkers.clear()
+        for ((idx, event) in visibleEvents.withIndex()) {
+            val m = Marker()
+            m.captionTextSize  = 11f
+            m.captionColor     = 0xFF212121.toInt()
+            m.captionHaloColor = 0xFFFFFFFF.toInt()
+            m.setCaptionAligns(Align.Top)
+            when (event) {
+                is PathEvent.Stay -> {
+                    m.position    = LatLng(event.lat, event.lng)
+                    m.icon        = OverlayImage.fromBitmap(stayDot)
+                    m.width       = stayDot.width
+                    m.height      = stayDot.height
+                    val from = formatTime(event.fromMs)
+                    val to   = formatTime(event.toMs)
+                    m.captionText = if (from == to) from else "$from~$to"
+                }
+                is PathEvent.Transit -> {
+                    m.position    = LatLng(event.lat, event.lng)
+                    m.icon        = OverlayImage.fromBitmap(transitDot)
+                    m.width       = transitDot.width
+                    m.height      = transitDot.height
+                    m.captionText = formatTime(event.timeMs)
+                }
+            }
+            m.map = map
+            timeMarkers[idx] = m
         }
     }
 
