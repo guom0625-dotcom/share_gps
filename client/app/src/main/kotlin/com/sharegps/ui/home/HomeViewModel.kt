@@ -1,6 +1,7 @@
 package com.sharegps.ui.home
 
 import android.app.Application
+import android.graphics.Bitmap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -35,7 +36,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
-    private var myId: String? = null
+    private val _avatars = MutableStateFlow<Map<String, Bitmap>>(emptyMap())
+    val avatars: StateFlow<Map<String, Bitmap>> = _avatars
+
+    var myId: String? = null
+        private set
 
     private val appLifecycleObserver = object : DefaultLifecycleObserver {
         override fun onStop(owner: LifecycleOwner) = stopWatching()
@@ -65,8 +70,26 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 }.toMap()
                 _positions.update { it + initial }
                 startWatching(members)
+                loadAvatars(members)
             }.onFailure { _error.value = it.message }
             _loading.value = false
+        }
+    }
+
+    private fun loadAvatars(members: List<FamilyMember>) {
+        for (member in members.filter { it.hasAvatar }) {
+            viewModelScope.launch {
+                val bytes = repo.avatarBytes(member.id) ?: return@launch
+                val bmp = createPhotoMarker(bytes)
+                _avatars.update { it + (member.id to bmp) }
+            }
+        }
+    }
+
+    fun uploadAvatar(bytes: ByteArray) {
+        viewModelScope.launch {
+            val ok = repo.uploadAvatar(bytes)
+            if (ok) load()
         }
     }
 

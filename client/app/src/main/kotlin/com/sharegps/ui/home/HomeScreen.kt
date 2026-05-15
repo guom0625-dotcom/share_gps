@@ -1,6 +1,10 @@
 package com.sharegps.ui.home
 
+import android.graphics.Bitmap
 import android.os.Bundle
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,11 +13,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -28,7 +37,6 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -44,8 +52,10 @@ import com.naver.maps.map.CameraUpdate
 import com.naver.maps.map.MapView
 import com.naver.maps.map.NaverMap
 import com.naver.maps.map.overlay.Marker
+import com.naver.maps.map.overlay.OverlayImage
 import com.sharegps.data.FamilyMember
 import com.sharegps.data.LocationUpdateMsg
+import kotlinx.coroutines.delay
 
 @Composable
 fun HomeScreen(vm: HomeViewModel = viewModel()) {
@@ -54,6 +64,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
     val selectedId by vm.selectedId.collectAsState()
     val loading   by vm.loading.collectAsState()
     val error     by vm.error.collectAsState()
+    val avatars   by vm.avatars.collectAsState()
 
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
@@ -63,12 +74,19 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
         }
     }
 
+    val context = LocalContext.current
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { u ->
+            val bytes = context.contentResolver.openInputStream(u)?.readBytes() ?: return@let
+            vm.uploadAvatar(bytes)
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding()
     ) {
-        // 헤더
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -83,7 +101,6 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
             TextButton(onClick = vm::load, enabled = !loading) { Text("새로고침") }
         }
 
-        // 가족 리스트 — 3명 분량 고정 높이, 스크롤 가능
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -102,8 +119,12 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
                             member   = member,
                             position = positions[member.id],
                             selected = member.id == selectedId,
+                            isMe     = member.id == vm.myId,
                             now      = now,
                             onClick  = { vm.selectMember(member.id) },
+                            onPickPhoto = {
+                                photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            },
                         )
                         HorizontalDivider(modifier = Modifier.fillMaxWidth())
                     }
@@ -121,11 +142,11 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
 
         HorizontalDivider(thickness = 2.dp)
 
-        // 지도 — 남은 공간 전체
         FamilyMapView(
             members    = members,
             positions  = positions,
             selectedId = selectedId,
+            avatars    = avatars,
             modifier   = Modifier.weight(1f),
         )
     }
@@ -133,11 +154,13 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
 
 @Composable
 private fun MemberRow(
-    member:   FamilyMember,
-    position: LocationUpdateMsg?,
-    selected: Boolean,
-    now:      Long,
-    onClick:  () -> Unit,
+    member:      FamilyMember,
+    position:    LocationUpdateMsg?,
+    selected:    Boolean,
+    isMe:        Boolean,
+    now:         Long,
+    onClick:     () -> Unit,
+    onPickPhoto: () -> Unit,
 ) {
     ListItem(
         modifier = Modifier.clickable(onClick = onClick),
@@ -152,6 +175,19 @@ private fun MemberRow(
             val batt = position?.battery?.let { " · 배터리 $it%" } ?: ""
             Text("$role · $time$batt")
         },
+        trailingContent = if (isMe) ({
+            IconButton(
+                onClick = onPickPhoto,
+                modifier = Modifier.size(36.dp),
+            ) {
+                Icon(
+                    Icons.Default.AddAPhoto,
+                    contentDescription = "프로필 사진 변경",
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }) else null,
     )
 }
 
@@ -160,6 +196,7 @@ private fun FamilyMapView(
     members:    List<FamilyMember>,
     positions:  Map<String, LocationUpdateMsg>,
     selectedId: String?,
+    avatars:    Map<String, Bitmap>,
     modifier:   Modifier = Modifier,
 ) {
     val context   = LocalContext.current
@@ -188,14 +225,21 @@ private fun FamilyMapView(
         onDispose { lifecycle.removeObserver(observer) }
     }
 
-    LaunchedEffect(positions, naverMap) {
+    LaunchedEffect(positions, naverMap, avatars) {
         val map = naverMap ?: return@LaunchedEffect
         for ((userId, pos) in positions) {
             val member = members.find { it.id == userId } ?: continue
-            val marker = markers.getOrPut(userId) {
-                Marker().apply { captionText = member.name }
-            }
+            val marker = markers.getOrPut(userId) { Marker() }
             marker.position = LatLng(pos.lat, pos.lng)
+            marker.captionText = member.name
+
+            val avatarBmp = avatars[userId]
+            val iconBmp = if (avatarBmp != null) avatarBmp
+                          else createInitialMarker(member.name)
+            marker.icon = OverlayImage.fromBitmap(iconBmp)
+            marker.width  = 96
+            marker.height = 96
+
             if (marker.map == null) marker.map = map
         }
     }

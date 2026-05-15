@@ -17,6 +17,7 @@ data class FamilyMember(
     val name: String,
     val role: String,
     val shareMode: String = "sharing",
+    val hasAvatar: Boolean = false,
     val current: CurrentLocation? = null,
 )
 

@@ -9,6 +9,7 @@ import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsBytes
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
@@ -26,6 +27,19 @@ class ApiRepository(private val serverUrl: String, private val apiKey: String) {
 
     suspend fun me(): Me =
         http.get("$serverUrl/me") { bearerAuth(apiKey) }.body()
+
+    suspend fun avatarBytes(userId: String): ByteArray? = try {
+        val res = http.get("$serverUrl/users/$userId/avatar")
+        if (res.status.isSuccess()) res.bodyAsBytes() else null
+    } catch (_: Exception) { null }
+
+    suspend fun uploadAvatar(bytes: ByteArray): Boolean = try {
+        http.post("$serverUrl/me/avatar") {
+            bearerAuth(apiKey)
+            contentType(ContentType.parse("image/jpeg"))
+            setBody(bytes)
+        }.status.isSuccess()
+    } catch (_: Exception) { false }
 
     suspend fun setShareState(mode: String, pausedUntilMinutes: Int? = null): Boolean = try {
         http.post("$serverUrl/me/share-state") {
