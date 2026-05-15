@@ -43,6 +43,7 @@ jobs:
           VERSION_NAME:         ${{ github.ref_name }}
           SERVER_URL:           https://guom0625.duckdns.org
           NAVER_MAPS_CLIENT_ID: ${{ secrets.NAVER_MAPS_CLIENT_ID }}
+          LOCAL_SERVER_URL:     ${{ secrets.LOCAL_SERVER_URL }}
         run: gradle :app:assembleRelease
 
       - name: Rename APK
