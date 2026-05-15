@@ -12,6 +12,7 @@ import com.sharegps.data.FamilyMember
 import com.sharegps.data.HistoryPoint
 import com.sharegps.data.KeyStore
 import com.sharegps.data.LocationUpdateMsg
+import com.sharegps.data.OwnLocationBroadcast
 import com.sharegps.data.WebSocketClient
 import com.sharegps.data.resolveServerUrl
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,6 +69,13 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     init {
         ProcessLifecycleOwner.get().lifecycle.addObserver(appLifecycleObserver)
         load()
+        viewModelScope.launch {
+            OwnLocationBroadcast.flow.collect { msg ->
+                myId?.let { id ->
+                    _positions.update { it + (id to msg.copy(userId = id)) }
+                }
+            }
+        }
     }
 
     fun load() {

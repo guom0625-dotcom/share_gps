@@ -16,6 +16,9 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -28,6 +31,8 @@ import com.sharegps.data.AppDatabase
 import com.sharegps.data.KeyStore
 import com.sharegps.data.LocationQueueDao
 import com.sharegps.data.LocationQueueEntity
+import com.sharegps.data.LocationUpdateMsg
+import com.sharegps.data.OwnLocationBroadcast
 import com.sharegps.data.WebSocketClient
 import com.sharegps.data.resolveServerUrl
 import kotlinx.coroutines.CoroutineScope
@@ -62,6 +67,10 @@ class LocationService : Service() {
     @Volatile private var activeMode = false
     private var locationCallback: LocationCallback? = null
 
+    private val fgObserver = object : DefaultLifecycleObserver {
+        override fun onStart(owner: LifecycleOwner) = requestFreshFix()
+    }
+
     override fun onCreate() {
         super.onCreate()
         fusedClient = LocationServices.getFusedLocationProviderClient(this)
@@ -80,12 +89,43 @@ class LocationService : Service() {
             if (!ws.isConnected) ws.connect()
         }
 
+        ProcessLifecycleOwner.get().lifecycle.addObserver(fgObserver)
+
         ServiceCompat.startForeground(
             this, NOTIF_ID, buildNotification(),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
         )
         requestLocationUpdates(false)
         startUploadLoop()
+    }
+
+    private fun getBattery(): Int? =
+        (getSystemService(BATTERY_SERVICE) as BatteryManager)
+            .getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+            .takeIf { it >= 0 }
+
+    private fun onNewLocation(loc: android.location.Location) {
+        scope.launch {
+            val battery = getBattery()
+            dao.insert(LocationQueueEntity(
+                lat = loc.latitude, lng = loc.longitude,
+                accuracy = loc.accuracy, battery = battery, timestamp = loc.time,
+            ))
+            val batteryField = if (battery != null) ""","battery":$battery""" else ""
+            wsClient?.sendRaw(
+                """{"type":"location","lat":${loc.latitude},"lng":${loc.longitude},"accuracy":${loc.accuracy},"recordedAt":${loc.time}$batteryField}"""
+            )
+            OwnLocationBroadcast.flow.tryEmit(
+                LocationUpdateMsg("", loc.latitude, loc.longitude, loc.accuracy.toDouble(), battery, loc.time)
+            )
+        }
+    }
+
+    private fun requestFreshFix() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED) return
+        fusedClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+            .addOnSuccessListener { loc -> loc?.let { onNewLocation(it) } }
     }
 
     private fun startUploadLoop() {
@@ -122,24 +162,7 @@ class LocationService : Service() {
         val cb = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
                 val loc = result.lastLocation ?: return
-                scope.launch {
-                    val battery = (getSystemService(BATTERY_SERVICE) as BatteryManager)
-                        .getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
-                        .takeIf { it >= 0 }
-                    dao.insert(
-                        LocationQueueEntity(
-                            lat = loc.latitude,
-                            lng = loc.longitude,
-                            accuracy = loc.accuracy,
-                            battery = battery,
-                            timestamp = loc.time,
-                        )
-                    )
-                    val batteryField = if (battery != null) ""","battery":$battery""" else ""
-                    wsClient?.sendRaw(
-                        """{"type":"location","lat":${loc.latitude},"lng":${loc.longitude},"accuracy":${loc.accuracy},"recordedAt":${loc.time}$batteryField}"""
-                    )
-                }
+                onNewLocation(loc)
             }
         }
         locationCallback = cb
@@ -149,6 +172,7 @@ class LocationService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
 
     override fun onDestroy() {
+        ProcessLifecycleOwner.get().lifecycle.removeObserver(fgObserver)
         locationCallback?.let { fusedClient.removeLocationUpdates(it) }
         wsClient?.onActiveModeChanged = null
         scope.cancel()
