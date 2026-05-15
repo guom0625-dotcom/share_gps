@@ -32,7 +32,6 @@ import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.sharegps.R
-import com.sharegps.data.ApiClient
 import com.sharegps.data.AppDatabase
 import com.sharegps.data.AuthEvent
 import com.sharegps.data.KeyStore
@@ -41,19 +40,13 @@ import com.sharegps.data.LocationQueueEntity
 import com.sharegps.data.LocationUpdateMsg
 import com.sharegps.data.OwnLocationBroadcast
 import com.sharegps.data.WebSocketClient
-import com.sharegps.data.resolveServerUrl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.json.JSONObject
-import java.time.Instant
-import java.time.LocalDateTime
-import java.time.ZoneId
 
 class LocationService : Service() {
 
@@ -71,7 +64,6 @@ class LocationService : Service() {
 
     private lateinit var fusedClient: FusedLocationProviderClient
     private lateinit var dao: LocationQueueDao
-    private lateinit var apiClient: ApiClient
     private var wsClient: WebSocketClient? = null
     private var transitionPendingIntent: PendingIntent? = null
 
@@ -80,7 +72,6 @@ class LocationService : Service() {
     @Volatile private var activeMode = false
     @Volatile private var isForeground = false
     private var locationCallback: LocationCallback? = null
-    private var lastUploadAt: Long = 0
 
     private val fgObserver = object : DefaultLifecycleObserver {
         override fun onStart(owner: LifecycleOwner) {
@@ -101,7 +92,6 @@ class LocationService : Service() {
 
         val key = KeyStore(this).getKey() ?: run { stopSelf(); return }
         dao = AppDatabase.get(this).locationQueueDao()
-        apiClient = ApiClient(resolveServerUrl(this), key)
 
         wsClient = WebSocketClient.get(this)?.also { ws ->
             ws.onActiveModeChanged = { active ->
@@ -122,7 +112,6 @@ class LocationService : Service() {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
         )
         requestLocationUpdates(false)
-        startUploadLoop()
         scope.launch {
             MotionState.isStill.drop(1).collect {
                 restartLocationUpdates(activeMode)
@@ -195,22 +184,6 @@ class LocationService : Service() {
             .addOnSuccessListener { loc -> loc?.let { onNewLocation(it) } }
     }
 
-    private fun startUploadLoop() {
-        scope.launch {
-            while (isActive) {
-                runCatching {
-                    val rows = dao.getOldest()
-                    if (rows.isNotEmpty() && apiClient.uploadBatch(rows)) {
-                        dao.deleteByIds(rows.map { it.id })
-                        lastUploadAt = System.currentTimeMillis()
-                        updateNotification()
-                    }
-                }
-                delay(10 * 60_000L)
-            }
-        }
-    }
-
     @Synchronized
     private fun restartLocationUpdates(active: Boolean) {
         locationCallback?.let { fusedClient.removeLocationUpdates(it) }
@@ -276,13 +249,9 @@ class LocationService : Service() {
             MotionState.isStill.value  -> "정지 감지 — GPS 일시 중단"
             else                       -> "위치 공유 중"
         }
-        val uploadText = if (lastUploadAt > 0) {
-            val ldt = LocalDateTime.ofInstant(Instant.ofEpochMilli(lastUploadAt), ZoneId.systemDefault())
-            " · %02d:%02d 업로드".format(ldt.hour, ldt.minute)
-        } else ""
         return NotificationCompat.Builder(this, NOTIF_CHANNEL)
             .setContentTitle(status)
-            .setContentText("share_gps$uploadText")
+            .setContentText("share_gps")
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setOngoing(true)
             .build()
