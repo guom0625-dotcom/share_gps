@@ -137,7 +137,8 @@ private fun MemberRow(
         supportingContent = {
             val role = if (member.role == "parent") "부모" else "자녀"
             val time = position?.let { relativeTime(it.recordedAt) } ?: "위치 없음"
-            Text("$role · $time")
+            val batt = position?.battery?.let { " · 배터리 $it%" } ?: ""
+            Text("$role · $time$batt")
         },
     )
 }

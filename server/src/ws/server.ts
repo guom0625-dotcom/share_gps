@@ -10,7 +10,7 @@ const AUTH_TIMEOUT_MS = 10_000;
 const AuthMsg = z.object({ type: z.literal('auth'), key: z.string() });
 
 const ClientMsg = z.discriminatedUnion('type', [
-    z.object({ type: z.literal('location'), lat: z.number(), lng: z.number(), accuracy: z.number().optional(), recordedAt: z.number().int() }),
+    z.object({ type: z.literal('location'), lat: z.number(), lng: z.number(), accuracy: z.number().optional(), battery: z.number().int().min(0).max(100).optional(), recordedAt: z.number().int() }),
     z.object({ type: z.literal('watch_start'), targetUserId: z.string() }),
     z.object({ type: z.literal('watch_stop'), targetUserId: z.string() }),
     z.object({ type: z.literal('ping') }),
@@ -27,10 +27,11 @@ export function registerWsServer(app: FastifyInstance, db: Db): void {
     const touchKey = db.prepare('UPDATE auth_keys SET last_used_at = ? WHERE key_hash = ?');
     const upsertCurrent = db.prepare(`
         INSERT INTO current_location (user_id, lat, lng, accuracy, activity, battery, recorded_at)
-        VALUES (?, ?, ?, ?, NULL, NULL, ?)
+        VALUES (?, ?, ?, ?, NULL, ?, ?)
         ON CONFLICT(user_id) DO UPDATE SET
             lat = excluded.lat, lng = excluded.lng,
             accuracy = excluded.accuracy,
+            battery = excluded.battery,
             recorded_at = excluded.recorded_at
         WHERE excluded.recorded_at > current_location.recorded_at
     `);
@@ -83,12 +84,13 @@ export function registerWsServer(app: FastifyInstance, db: Db): void {
 
             switch (msg.data.type) {
                 case 'location': {
-                    const { lat, lng, accuracy, recordedAt } = msg.data;
-                    upsertCurrent.run(userId, lat, lng, accuracy ?? null, recordedAt);
+                    const { lat, lng, accuracy, battery, recordedAt } = msg.data;
+                    upsertCurrent.run(userId, lat, lng, accuracy ?? null, battery ?? null, recordedAt);
                     sessions.broadcastToWatchers(userId, {
                         type: 'location_update',
                         userId, lat, lng,
                         accuracy: accuracy ?? null,
+                        battery: battery ?? null,
                         recordedAt,
                     });
                     break;

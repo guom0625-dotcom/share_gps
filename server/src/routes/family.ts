@@ -10,6 +10,7 @@ interface FamilyRow {
     lat: number | null;
     lng: number | null;
     accuracy: number | null;
+    battery: number | null;
     recorded_at: number | null;
 }
 
@@ -38,7 +39,7 @@ export function registerFamilyRoutes(
         SELECT
             u.id, u.name, u.role,
             COALESCE(s.mode, 'sharing') AS share_mode,
-            cl.lat, cl.lng, cl.accuracy, cl.recorded_at
+            cl.lat, cl.lng, cl.accuracy, cl.battery, cl.recorded_at
         FROM users u
         LEFT JOIN share_state s ON s.user_id = u.id
         LEFT JOIN current_location cl ON cl.user_id = u.id
@@ -69,7 +70,7 @@ export function registerFamilyRoutes(
             shareMode: r.share_mode ?? 'sharing',
             current:
                 r.lat !== null && r.recorded_at !== null
-                    ? { lat: r.lat, lng: r.lng, accuracy: r.accuracy, recordedAt: r.recorded_at }
+                    ? { lat: r.lat, lng: r.lng, accuracy: r.accuracy, battery: r.battery, recordedAt: r.recorded_at }
                     : null,
         }));
     });

@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.os.BatteryManager
 import android.os.IBinder
 import android.os.Looper
 import androidx.core.app.ActivityCompat
@@ -130,8 +131,12 @@ class LocationService : Service() {
                             timestamp = loc.time,
                         )
                     )
+                    val battery = (getSystemService(BATTERY_SERVICE) as BatteryManager)
+                        .getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                        .takeIf { it >= 0 }
+                    val batteryField = if (battery != null) ""","battery":$battery""" else ""
                     wsClient?.sendRaw(
-                        """{"type":"location","lat":${loc.latitude},"lng":${loc.longitude},"accuracy":${loc.accuracy},"recordedAt":${loc.time}}"""
+                        """{"type":"location","lat":${loc.latitude},"lng":${loc.longitude},"accuracy":${loc.accuracy},"recordedAt":${loc.time}$batteryField}"""
                     )
                 }
             }

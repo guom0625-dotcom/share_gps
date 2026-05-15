@@ -7,6 +7,7 @@ data class CurrentLocation(
     val lat: Double,
     val lng: Double,
     val accuracy: Double? = null,
+    val battery: Int? = null,
     val recordedAt: Long,
 )
 
@@ -24,6 +25,7 @@ data class LocationUpdateMsg(
     val lat: Double,
     val lng: Double,
     val accuracy: Double?,
+    val battery: Int? = null,
     val recordedAt: Long,
 )
 

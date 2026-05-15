@@ -114,6 +114,7 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
                                 lat = json.optDouble("lat"),
                                 lng = json.optDouble("lng"),
                                 accuracy = json.optDouble("accuracy").takeIf { !it.isNaN() },
+                                battery = if (json.has("battery") && !json.isNull("battery")) json.optInt("battery") else null,
                                 recordedAt = json.optLong("recordedAt"),
                             )
                         )
