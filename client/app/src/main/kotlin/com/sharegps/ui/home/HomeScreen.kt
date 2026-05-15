@@ -373,6 +373,12 @@ private fun FamilyMapView(
                     val from = formatTime(event.fromMs)
                     val to   = formatTime(event.toMs)
                     m.captionText = if (from == to) from else "$from~$to"
+                    val durationMin = ((event.toMs - event.fromMs) / 60_000).toInt()
+                    m.subCaptionText = if (durationMin >= 60)
+                        "${durationMin / 60}시간 ${durationMin % 60}분"
+                    else "${durationMin}분"
+                    m.subCaptionTextSize = 10f
+                    m.subCaptionColor = 0xFF616161.toInt()
                 }
                 is PathEvent.Transit -> {
                     m.position    = LatLng(event.lat, event.lng)
@@ -380,6 +386,9 @@ private fun FamilyMapView(
                     m.width       = transitDot.width
                     m.height      = transitDot.height
                     m.captionText = formatTime(event.timeMs)
+                    m.subCaptionText = speedLabel(event.speed)
+                    m.subCaptionTextSize = 10f
+                    m.subCaptionColor = 0xFF424242.toInt()
                 }
             }
             m.map = map

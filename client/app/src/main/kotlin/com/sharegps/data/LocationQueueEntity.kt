@@ -11,4 +11,5 @@ data class LocationQueueEntity(
     val accuracy: Float,
     val battery: Int? = null,
     val timestamp: Long,
+    val speed: Double? = null,
 )

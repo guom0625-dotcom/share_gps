@@ -14,9 +14,11 @@ declare module 'fastify' {
     }
 }
 
+const ONE_HOUR_MS = 3_600_000;
+
 export function makeAuth(db: Db) {
     const find = db.prepare(`
-        SELECT u.id, u.name, u.role
+        SELECT u.id, u.name, u.role, k.last_used_at
         FROM auth_keys k
         JOIN users u ON u.id = k.user_id
         WHERE k.key_hash = ?
@@ -32,12 +34,15 @@ export function makeAuth(db: Db) {
             return;
         }
         const keyHash = createHash('sha256').update(header.slice(7)).digest('hex');
-        const row = find.get(keyHash) as AuthUser | undefined;
+        const row = find.get(keyHash) as (AuthUser & { last_used_at: number | null }) | undefined;
         if (!row) {
             await reply.code(401).send({ error: 'unauthorized' });
             return;
         }
-        touch.run(Date.now(), keyHash);
+        const now = Date.now();
+        if (!row.last_used_at || now - row.last_used_at > ONE_HOUR_MS) {
+            touch.run(now, keyHash);
+        }
         req.user = row;
     };
 }

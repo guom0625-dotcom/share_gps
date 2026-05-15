@@ -10,6 +10,7 @@ const PointSchema = z.object({
     activity: z.string().optional(),
     battery: z.number().int().optional(),
     recordedAt: z.number().int(),
+    speed: z.number().optional(),
 });
 
 const BatchSchema = z.array(PointSchema).min(1).max(500);
@@ -25,8 +26,8 @@ export function registerLocationRoutes(
         'SELECT mode FROM share_state WHERE user_id = ?',
     );
     const insertLoc = db.prepare(`
-        INSERT OR IGNORE INTO locations (user_id, lat, lng, accuracy, activity, battery, recorded_at, received_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT OR IGNORE INTO locations (user_id, lat, lng, accuracy, activity, battery, speed, recorded_at, received_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const upsertCurrent = db.prepare(`
         INSERT INTO current_location (user_id, lat, lng, accuracy, activity, battery, recorded_at)
@@ -57,7 +58,7 @@ export function registerLocationRoutes(
 
         const save = db.transaction(() => {
             for (const p of points) {
-                insertLoc.run(userId, p.lat, p.lng, p.accuracy ?? null, p.activity ?? null, p.battery ?? null, p.recordedAt, receivedAt);
+                insertLoc.run(userId, p.lat, p.lng, p.accuracy ?? null, p.activity ?? null, p.battery ?? null, p.speed ?? null, p.recordedAt, receivedAt);
                 upsertCurrent.run(userId, p.lat, p.lng, p.accuracy ?? null, p.activity ?? null, p.battery ?? null, p.recordedAt);
             }
         });
@@ -106,7 +107,7 @@ export function registerLocationRoutes(
 
             const BUCKET_MS = 5 * 60 * 1000; // 5분
             const rows = db.prepare(`
-                SELECT lat, lng, accuracy, MIN(recorded_at) AS recordedAt
+                SELECT lat, lng, accuracy, speed, MIN(recorded_at) AS recordedAt
                 FROM locations
                 WHERE user_id = ? AND recorded_at BETWEEN ? AND ?
                 GROUP BY recorded_at / ${BUCKET_MS}

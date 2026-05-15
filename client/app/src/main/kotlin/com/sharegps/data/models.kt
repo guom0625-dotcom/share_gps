@@ -37,6 +37,7 @@ data class HistoryPoint(
     val lng: Double,
     val accuracy: Double? = null,
     val recordedAt: Long,
+    val speed: Double? = null,
 )
 
 @Serializable

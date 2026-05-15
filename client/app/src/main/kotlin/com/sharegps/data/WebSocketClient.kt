@@ -51,6 +51,8 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
 
     @Volatile private var ws: WebSocket? = null
     @Volatile private var reconnectJob: Job? = null
+    @Volatile var myUserId: String? = null
+        private set
     val isConnected: Boolean get() = ws != null
     val isBeingWatched: Boolean get() = activeViewers.isNotEmpty()
 
@@ -65,12 +67,12 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
 
     fun watchStart(targetUserId: String) {
         watchingTargets.add(targetUserId)
-        sendRaw("""{"type":"watch_start","targetUserId":"$targetUserId"}""")
+        sendRaw(JSONObject().put("type", "watch_start").put("targetUserId", targetUserId).toString())
     }
 
     fun watchStop(targetUserId: String) {
         watchingTargets.remove(targetUserId)
-        sendRaw("""{"type":"watch_stop","targetUserId":"$targetUserId"}""")
+        sendRaw(JSONObject().put("type", "watch_stop").put("targetUserId", targetUserId).toString())
     }
 
     private fun scheduleReconnect(delayMs: Long = 5_000L) {
@@ -84,7 +86,7 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
     private val listener = object : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) {
             reconnectJob?.cancel()
-            webSocket.send("""{"type":"auth","key":"$apiKey"}""")
+            webSocket.send(JSONObject().put("type", "auth").put("key", apiKey).toString())
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
@@ -92,8 +94,9 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
                 val json = JSONObject(text)
                 when (json.optString("type")) {
                     "auth_ok" -> {
+                        myUserId = json.optString("userId").takeIf { it.isNotEmpty() }
                         for (targetId in watchingTargets) {
-                            webSocket.send("""{"type":"watch_start","targetUserId":"$targetId"}""")
+                            webSocket.send(JSONObject().put("type", "watch_start").put("targetUserId", targetId).toString())
                         }
                     }
                     "watching" -> {

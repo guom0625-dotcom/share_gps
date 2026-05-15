@@ -22,6 +22,7 @@ private data class LocationPayload(
     val accuracy: Float,
     val battery: Int? = null,
     val recordedAt: Long,
+    val speed: Double? = null,
 )
 
 class ApiClient(private val serverUrl: String, private val apiKey: String) {
@@ -34,7 +35,7 @@ class ApiClient(private val serverUrl: String, private val apiKey: String) {
         val response = http.post("$serverUrl/locations/batch") {
             bearerAuth(apiKey)
             contentType(ContentType.Application.Json)
-            setBody(rows.map { LocationPayload(it.lat, it.lng, it.accuracy, it.battery, it.timestamp) })
+            setBody(rows.map { LocationPayload(it.lat, it.lng, it.accuracy, it.battery, it.timestamp, it.speed) })
         }
         if (response.status == HttpStatusCode.Unauthorized) {
             AuthEvent.needsReEnroll.tryEmit(Unit)

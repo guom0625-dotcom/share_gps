@@ -18,6 +18,7 @@ sealed class PathEvent {
     data class Transit(
         val lat: Double, val lng: Double,
         val timeMs: Long,
+        val speed: Double? = null,
     ) : PathEvent()
 }
 
@@ -46,7 +47,7 @@ fun processHistoryPath(points: List<HistoryPoint>): List<PathEvent> {
             ))
             i = j
         } else {
-            events.add(PathEvent.Transit(anchor.lat, anchor.lng, anchor.recordedAt))
+            events.add(PathEvent.Transit(anchor.lat, anchor.lng, anchor.recordedAt, anchor.speed))
             i++
         }
     }

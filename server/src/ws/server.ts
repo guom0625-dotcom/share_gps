@@ -10,7 +10,7 @@ const AUTH_TIMEOUT_MS = 10_000;
 const AuthMsg = z.object({ type: z.literal('auth'), key: z.string() });
 
 const ClientMsg = z.discriminatedUnion('type', [
-    z.object({ type: z.literal('location'), lat: z.number(), lng: z.number(), accuracy: z.number().optional(), battery: z.number().int().min(0).max(100).optional(), recordedAt: z.number().int() }),
+    z.object({ type: z.literal('location'), lat: z.number(), lng: z.number(), accuracy: z.number().optional(), battery: z.number().int().min(0).max(100).optional(), recordedAt: z.number().int(), speed: z.number().optional() }),
     z.object({ type: z.literal('watch_start'), targetUserId: z.string() }),
     z.object({ type: z.literal('watch_stop'), targetUserId: z.string() }),
     z.object({ type: z.literal('ping') }),
@@ -36,8 +36,8 @@ export function registerWsServer(app: FastifyInstance, db: Db): void {
         WHERE excluded.recorded_at > current_location.recorded_at
     `);
     const insertLoc = db.prepare(`
-        INSERT OR IGNORE INTO locations (user_id, lat, lng, accuracy, activity, battery, recorded_at, received_at)
-        VALUES (?, ?, ?, ?, NULL, ?, ?, ?)
+        INSERT OR IGNORE INTO locations (user_id, lat, lng, accuracy, activity, battery, speed, recorded_at, received_at)
+        VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?)
     `);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -88,11 +88,11 @@ export function registerWsServer(app: FastifyInstance, db: Db): void {
 
             switch (msg.data.type) {
                 case 'location': {
-                    const { lat, lng, accuracy, battery, recordedAt } = msg.data;
+                    const { lat, lng, accuracy, battery, recordedAt, speed } = msg.data;
                     const receivedAt = Date.now();
                     db.transaction(() => {
                         upsertCurrent.run(userId, lat, lng, accuracy ?? null, battery ?? null, recordedAt);
-                        insertLoc.run(userId, lat, lng, accuracy ?? null, battery ?? null, recordedAt, receivedAt);
+                        insertLoc.run(userId, lat, lng, accuracy ?? null, battery ?? null, speed ?? null, recordedAt, receivedAt);
                     })();
                     sessions.broadcastToWatchers(userId, {
                         type: 'location_update',

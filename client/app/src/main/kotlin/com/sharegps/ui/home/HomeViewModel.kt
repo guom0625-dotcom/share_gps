@@ -15,6 +15,7 @@ import com.sharegps.data.LocationUpdateMsg
 import com.sharegps.data.OwnLocationBroadcast
 import com.sharegps.data.WebSocketClient
 import com.sharegps.data.resolveServerUrl
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -58,6 +59,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     var myId: String? = null
         private set
+    private var watchJob: Job? = null
 
     private val appLifecycleObserver = object : DefaultLifecycleObserver {
         override fun onStop(owner: LifecycleOwner) = stopWatching()
@@ -118,7 +120,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun loadAvatars(members: List<FamilyMember>) {
-        for (member in members.filter { it.hasAvatar }) {
+        for (member in members.filter { it.hasAvatar && !_avatars.value.containsKey(member.id) }) {
             viewModelScope.launch {
                 val bytes = repo.avatarBytes(member.id) ?: return@launch
                 val bmp = createPhotoMarker(bytes)
@@ -172,7 +174,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private fun startWatching(members: List<FamilyMember>) {
         val ws = WebSocketClient.get(getApplication()) ?: return
         for (member in members.filter { it.id != myId }) ws.watchStart(member.id)
-        viewModelScope.launch {
+        if (watchJob?.isActive == true) return
+        watchJob = viewModelScope.launch {
             ws.locationUpdates.collect { msg ->
                 _positions.update { current -> current + (msg.userId to msg) }
             }

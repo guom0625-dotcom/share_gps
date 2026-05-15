@@ -47,8 +47,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.json.JSONObject
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
 
 class LocationService : Service() {
 
@@ -74,6 +79,7 @@ class LocationService : Service() {
 
     @Volatile private var activeMode = false
     private var locationCallback: LocationCallback? = null
+    private var lastUploadAt: Long = 0
 
     private val fgObserver = object : DefaultLifecycleObserver {
         override fun onStart(owner: LifecycleOwner) = requestFreshFix()
@@ -107,7 +113,10 @@ class LocationService : Service() {
         requestLocationUpdates(false)
         startUploadLoop()
         scope.launch {
-            MotionState.isStill.collect { restartLocationUpdates(activeMode) }
+            MotionState.isStill.drop(1).collect {
+                restartLocationUpdates(activeMode)
+                updateNotification()
+            }
         }
         scope.launch {
             AuthEvent.needsReEnroll.collect { stopSelf() }
@@ -149,15 +158,21 @@ class LocationService : Service() {
             val speed = if (loc.hasSpeed() && loc.speed > 0.5f) loc.speed.toDouble() else null
             dao.insert(LocationQueueEntity(
                 lat = loc.latitude, lng = loc.longitude,
-                accuracy = loc.accuracy, battery = battery, timestamp = loc.time,
+                accuracy = loc.accuracy, battery = battery, timestamp = loc.time, speed = speed,
             ))
-            val batteryField = if (battery != null) ""","battery":$battery""" else ""
-            val speedField   = if (speed   != null) ""","speed":$speed"""   else ""
-            wsClient?.sendRaw(
-                """{"type":"location","lat":${loc.latitude},"lng":${loc.longitude},"accuracy":${loc.accuracy},"recordedAt":${loc.time}$batteryField$speedField}"""
-            )
+            val json = JSONObject().apply {
+                put("type", "location")
+                put("lat", loc.latitude)
+                put("lng", loc.longitude)
+                put("accuracy", loc.accuracy)
+                put("recordedAt", loc.time)
+                battery?.let { put("battery", it) }
+                speed?.let   { put("speed", it) }
+            }
+            wsClient?.sendRaw(json.toString())
+            val myId = wsClient?.myUserId ?: ""
             OwnLocationBroadcast.flow.tryEmit(
-                LocationUpdateMsg("", loc.latitude, loc.longitude, loc.accuracy.toDouble(), battery, loc.time, speed)
+                LocationUpdateMsg(myId, loc.latitude, loc.longitude, loc.accuracy.toDouble(), battery, loc.time, speed)
             )
         }
     }
@@ -176,6 +191,8 @@ class LocationService : Service() {
                     val rows = dao.getOldest()
                     if (rows.isNotEmpty() && apiClient.uploadBatch(rows)) {
                         dao.deleteByIds(rows.map { it.id })
+                        lastUploadAt = System.currentTimeMillis()
+                        updateNotification()
                     }
                 }
                 delay(2 * 60_000L)
@@ -189,6 +206,7 @@ class LocationService : Service() {
         locationCallback = null
         if (!active && MotionState.isStill.value) return
         requestLocationUpdates(active)
+        updateNotification()
     }
 
     private fun requestLocationUpdates(active: Boolean) {
@@ -227,13 +245,26 @@ class LocationService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    private fun updateNotification() {
+        getSystemService(NotificationManager::class.java).notify(NOTIF_ID, buildNotification())
+    }
+
     private fun buildNotification(): Notification {
         getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(NOTIF_CHANNEL, "위치 공유", NotificationManager.IMPORTANCE_LOW)
         )
+        val status = when {
+            MotionState.isStill.value -> "정지 감지 — GPS 일시 중단"
+            activeMode                -> "실시간 공유 중"
+            else                      -> "위치 공유 중"
+        }
+        val uploadText = if (lastUploadAt > 0) {
+            val ldt = LocalDateTime.ofInstant(Instant.ofEpochMilli(lastUploadAt), ZoneId.systemDefault())
+            " · %02d:%02d 업로드".format(ldt.hour, ldt.minute)
+        } else ""
         return NotificationCompat.Builder(this, NOTIF_CHANNEL)
-            .setContentTitle("위치 공유 중")
-            .setContentText("백그라운드에서 위치를 공유하고 있습니다")
+            .setContentTitle(status)
+            .setContentText("share_gps$uploadText")
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setOngoing(true)
             .build()
