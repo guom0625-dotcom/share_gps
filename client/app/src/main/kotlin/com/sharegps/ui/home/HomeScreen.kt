@@ -84,6 +84,7 @@ import com.sharegps.data.FamilyMember
 import com.sharegps.data.HistoryPoint
 import com.sharegps.data.LocationUpdateMsg
 import java.time.YearMonth
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
 @Composable
@@ -410,6 +411,9 @@ private fun FamilyMapView(
             val marker = markers.getOrPut(userId) { Marker() }
             marker.position = latlng
             marker.captionText = member.name
+            marker.subCaptionText = speedLabel(pos.speed)
+            marker.subCaptionTextSize = 10f
+            marker.subCaptionColor = 0xFF424242.toInt()
 
             val avatarBmp = avatars[userId]
             val iconBmp = if (avatarBmp != null) avatarBmp
@@ -559,4 +563,10 @@ private fun relativeTime(ts: Long, now: Long = System.currentTimeMillis()): Stri
         diff < 86_400_000L -> "${diff / 3_600_000}시간 전"
         else               -> "${diff / 86_400_000}일 전"
     }
+}
+
+private fun speedLabel(speedMs: Double?): String {
+    if (speedMs == null || speedMs < 1.0) return ""
+    return if (speedMs >= 8.0) "🚗 ${(speedMs * 3.6).roundToInt()}km/h"
+    else "🚶 이동 중"
 }

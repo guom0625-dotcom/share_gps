@@ -142,16 +142,18 @@ class LocationService : Service() {
     private fun onNewLocation(loc: android.location.Location) {
         scope.launch {
             val battery = getBattery()
+            val speed = if (loc.hasSpeed() && loc.speed > 0.5f) loc.speed.toDouble() else null
             dao.insert(LocationQueueEntity(
                 lat = loc.latitude, lng = loc.longitude,
                 accuracy = loc.accuracy, battery = battery, timestamp = loc.time,
             ))
             val batteryField = if (battery != null) ""","battery":$battery""" else ""
+            val speedField   = if (speed   != null) ""","speed":$speed"""   else ""
             wsClient?.sendRaw(
-                """{"type":"location","lat":${loc.latitude},"lng":${loc.longitude},"accuracy":${loc.accuracy},"recordedAt":${loc.time}$batteryField}"""
+                """{"type":"location","lat":${loc.latitude},"lng":${loc.longitude},"accuracy":${loc.accuracy},"recordedAt":${loc.time}$batteryField$speedField}"""
             )
             OwnLocationBroadcast.flow.tryEmit(
-                LocationUpdateMsg("", loc.latitude, loc.longitude, loc.accuracy.toDouble(), battery, loc.time)
+                LocationUpdateMsg("", loc.latitude, loc.longitude, loc.accuracy.toDouble(), battery, loc.time, speed)
             )
         }
     }

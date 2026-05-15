@@ -28,6 +28,7 @@ data class LocationUpdateMsg(
     val accuracy: Double?,
     val battery: Int? = null,
     val recordedAt: Long,
+    val speed: Double? = null,  // m/s, null = unknown
 )
 
 @Serializable
