@@ -19,6 +19,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.google.android.gms.location.ActivityRecognition
@@ -70,7 +71,7 @@ class LocationService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Volatile private var activeMode = false
-    @Volatile private var isForeground = false
+    @Volatile private var isForeground = ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
     private var locationCallback: LocationCallback? = null
 
     private val fgObserver = object : DefaultLifecycleObserver {
