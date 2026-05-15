@@ -62,12 +62,19 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private var watchJob: Job? = null
 
     private val appLifecycleObserver = object : DefaultLifecycleObserver {
-        override fun onStop(owner: LifecycleOwner) = stopWatching()
+        override fun onStop(owner: LifecycleOwner) {
+            _selectedId.value?.takeIf { it != myId }?.let {
+                WebSocketClient.get(getApplication())?.watchStop(it)
+            }
+        }
         override fun onStart(owner: LifecycleOwner) {
             if (_members.value.isNotEmpty()) {
                 refresh()
-                startWatching(_members.value)
+                _selectedId.value?.takeIf { it != myId }?.let {
+                    WebSocketClient.get(getApplication())?.watchStart(it)
+                }
             }
+            startLocationUpdatesJob()
         }
     }
 
@@ -98,7 +105,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }.toMap()
                 _positions.update { it + initial }
-                startWatching(members)
+                startLocationUpdatesJob()
                 loadAvatars(members)
             }.onFailure { _error.value = it.message }
             _loading.value = false
@@ -180,10 +187,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun startWatching(members: List<FamilyMember>) {
-        val ws = WebSocketClient.get(getApplication()) ?: return
-        for (member in members.filter { it.id != myId }) ws.watchStart(member.id)
+    private fun startLocationUpdatesJob() {
         if (watchJob?.isActive == true) return
+        val ws = WebSocketClient.get(getApplication()) ?: return
         watchJob = viewModelScope.launch {
             ws.locationUpdates.collect { msg ->
                 _positions.update { current -> current + (msg.userId to msg) }
@@ -191,14 +197,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun stopWatching() {
-        val ws = WebSocketClient.get(getApplication()) ?: return
-        for (member in _members.value.filter { it.id != myId }) ws.watchStop(member.id)
-    }
-
     override fun onCleared() {
         super.onCleared()
         ProcessLifecycleOwner.get().lifecycle.removeObserver(appLifecycleObserver)
-        stopWatching()
+        _selectedId.value?.takeIf { it != myId }?.let {
+            WebSocketClient.get(getApplication())?.watchStop(it)
+        }
     }
 }
