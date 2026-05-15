@@ -24,9 +24,11 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -52,6 +54,14 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
     val selectedId by vm.selectedId.collectAsState()
     val loading   by vm.loading.collectAsState()
     val error     by vm.error.collectAsState()
+
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(30_000L)
+            now = System.currentTimeMillis()
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -92,6 +102,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
                             member   = member,
                             position = positions[member.id],
                             selected = member.id == selectedId,
+                            now      = now,
                             onClick  = { vm.selectMember(member.id) },
                         )
                         HorizontalDivider(modifier = Modifier.fillMaxWidth())
@@ -125,6 +136,7 @@ private fun MemberRow(
     member:   FamilyMember,
     position: LocationUpdateMsg?,
     selected: Boolean,
+    now:      Long,
     onClick:  () -> Unit,
 ) {
     ListItem(
@@ -136,7 +148,7 @@ private fun MemberRow(
         headlineContent = { Text(member.name) },
         supportingContent = {
             val role = if (member.role == "parent") "부모" else "자녀"
-            val time = position?.let { relativeTime(it.recordedAt) } ?: "위치 없음"
+            val time = position?.let { relativeTime(it.recordedAt, now) } ?: "위치 없음"
             val batt = position?.battery?.let { " · 배터리 $it%" } ?: ""
             Text("$role · $time$batt")
         },
@@ -222,8 +234,8 @@ private fun FamilyMapView(
     )
 }
 
-private fun relativeTime(ts: Long): String {
-    val diff = System.currentTimeMillis() - ts
+private fun relativeTime(ts: Long, now: Long = System.currentTimeMillis()): String {
+    val diff = now - ts
     return when {
         diff < 60_000L     -> "방금 전"
         diff < 3_600_000L  -> "${diff / 60_000}분 전"
