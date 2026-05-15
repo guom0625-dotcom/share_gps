@@ -141,11 +141,12 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun selectMember(memberId: String) {
-        val next = if (_selectedId.value == memberId) null else memberId
+        val prev = _selectedId.value
+        val next = if (prev == memberId) null else memberId
         _selectedId.value = next
-        if (next != null && next != myId) {
-            WebSocketClient.get(getApplication())?.watchStart(next)
-        }
+        val ws = WebSocketClient.get(getApplication()) ?: return
+        if (next != null && next != myId) ws.watchStart(next)
+        if (prev != null && prev != myId && prev != next) ws.watchStop(prev)
     }
 
     fun enterHistory(memberId: String) {
