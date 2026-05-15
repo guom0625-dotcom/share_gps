@@ -72,6 +72,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.naver.maps.geometry.LatLng
 import com.naver.maps.geometry.LatLngBounds
+import com.naver.maps.map.CameraAnimation
 import com.naver.maps.map.CameraUpdate
 import com.naver.maps.map.MapView
 import com.naver.maps.map.NaverMap
@@ -459,9 +460,9 @@ private fun FamilyMapView(
         lastTrackedId = selectedId
         val target = LatLng(selectedPos.lat, selectedPos.lng)
         if (isNewSelection) {
-            map.animateCamera(CameraUpdate.scrollAndZoomTo(target, 15.0))
+            map.moveCamera(CameraUpdate.scrollAndZoomTo(target, 15.0).animate(CameraAnimation.Easing))
         } else {
-            map.animateCamera(CameraUpdate.scrollTo(target))
+            map.moveCamera(CameraUpdate.scrollTo(target).animate(CameraAnimation.Easing, 800))
         }
     }
 
