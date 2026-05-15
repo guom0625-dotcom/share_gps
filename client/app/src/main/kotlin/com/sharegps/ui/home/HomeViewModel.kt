@@ -141,7 +141,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun selectMember(memberId: String) {
-        _selectedId.value = if (_selectedId.value == memberId) null else memberId
+        val next = if (_selectedId.value == memberId) null else memberId
+        _selectedId.value = next
+        if (next != null && next != myId) {
+            WebSocketClient.get(getApplication())?.watchStart(next)
+        }
     }
 
     fun enterHistory(memberId: String) {
