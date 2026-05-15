@@ -60,7 +60,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 _members.value = members
                 val initial = members.mapNotNull { m ->
                     m.current?.let { loc ->
-                        m.id to LocationUpdateMsg(m.id, loc.lat, loc.lng, loc.accuracy, loc.recordedAt)
+                        m.id to LocationUpdateMsg(m.id, loc.lat, loc.lng, loc.accuracy, loc.battery, loc.recordedAt)
                     }
                 }.toMap()
                 _positions.update { it + initial }
