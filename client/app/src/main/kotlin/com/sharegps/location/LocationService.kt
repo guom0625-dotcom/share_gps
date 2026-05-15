@@ -1,6 +1,7 @@
 package com.sharegps.location
 
 import android.Manifest
+import android.util.Log
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -76,11 +77,13 @@ class LocationService : Service() {
 
     private val fgObserver = object : DefaultLifecycleObserver {
         override fun onStart(owner: LifecycleOwner) {
+            Log.d("LocSvc", "fgObserver.onStart isFg=$isForeground→true activeMode=$activeMode")
             isForeground = true
             requestFreshFix()
             restartLocationUpdates(activeMode)
         }
         override fun onStop(owner: LifecycleOwner) {
+            Log.d("LocSvc", "fgObserver.onStop isFg=$isForeground→false activeMode=$activeMode")
             isForeground = false
             restartLocationUpdates(activeMode)
             if (!activeMode) stopAndExit()
@@ -96,13 +99,16 @@ class LocationService : Service() {
 
         wsClient = WebSocketClient.get(this)?.also { ws ->
             ws.onActiveModeChanged = { active ->
+                Log.d("LocSvc", "onActiveModeChanged active=$active prev=$activeMode isFg=$isForeground")
                 if (active != activeMode) {
                     activeMode = active
                     restartLocationUpdates(active)
-                    if (!active) stopAndExit()
+                    if (!active) { Log.d("LocSvc", "stopAndExit via onActiveModeChanged"); stopAndExit() }
+                } else {
+                    Log.d("LocSvc", "onActiveModeChanged SKIPPED (same value)")
                 }
             }
-            ws.onNoWatchers = { stopAndExit() }
+            ws.onNoWatchers = { Log.d("LocSvc", "onNoWatchers → stopAndExit"); stopAndExit() }
             if (!ws.isConnected) ws.connect()
         }
 
@@ -220,6 +226,7 @@ class LocationService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_NOT_STICKY
 
     private fun stopAndExit() {
+        Log.d("LocSvc", "stopAndExit called activeMode=$activeMode isFg=$isForeground")
         wsClient?.disconnect()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()

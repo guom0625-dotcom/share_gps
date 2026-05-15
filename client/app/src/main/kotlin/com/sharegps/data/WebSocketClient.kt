@@ -1,6 +1,7 @@
 package com.sharegps.data
 
 import android.content.Context
+import android.util.Log
 import com.sharegps.BuildConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -114,6 +115,7 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
                     }
                     "watching" -> {
                         val viewerId = json.optString("viewerUserId")
+                        Log.d("WS", "watching from $viewerId, viewers=${activeViewers.size+1}, cbSet=${onActiveModeChanged!=null}")
                         if (viewerId.isNotEmpty() && activeViewers.add(viewerId)) {
                             onActiveModeChanged?.invoke(true)
                         }
@@ -121,10 +123,12 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
                     "watching_stop" -> {
                         val viewerId = json.optString("viewerUserId")
                         activeViewers.remove(viewerId)
+                        Log.d("WS", "watching_stop from $viewerId, remaining=${activeViewers.size}, cbSet=${onActiveModeChanged!=null}")
                         if (activeViewers.isEmpty()) onActiveModeChanged?.invoke(false)
                     }
                     "no_watchers" -> {
                         activeViewers.clear()
+                        Log.d("WS", "no_watchers, cbSet=${onNoWatchers!=null}")
                         onNoWatchers?.invoke()
                     }
                     "location_update" -> {
