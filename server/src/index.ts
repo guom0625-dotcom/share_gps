@@ -5,11 +5,13 @@ const _ni = os.networkInterfaces.bind(os);
 os.networkInterfaces = () => { try { return _ni(); } catch { return {}; } };
 import Fastify from 'fastify';
 import websocket from '@fastify/websocket';
+import staticPlugin from '@fastify/static';
 import { openDb } from './db.ts';
 import { makeAuth } from './auth.ts';
 import { registerFamilyRoutes } from './routes/family.ts';
 import { registerLocationRoutes } from './routes/locations.ts';
 import { registerShareStateRoutes } from './routes/shareState.ts';
+import { registerAvatarRoutes } from './routes/avatar.ts';
 import { registerWsServer } from './ws/server.ts';
 
 const PORT = Number(process.env.PORT ?? 3000);
@@ -23,11 +25,13 @@ const app = Fastify({ logger: { level: LOG_LEVEL } });
 
 app.decorateRequest('user', null);
 await app.register(websocket);
+await app.register(staticPlugin, { root: '/', prefixAvoidTrailingSlash: true });
 
 const auth = makeAuth(db);
 registerFamilyRoutes(app, db, auth);
 registerLocationRoutes(app, db, auth);
 registerShareStateRoutes(app, db, auth);
+registerAvatarRoutes(app, auth);
 registerWsServer(app, db);
 
 app.get('/health', async () => ({ ok: true, time: Date.now() }));

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Db } from '../db.ts';
 import type { makeAuth } from '../auth.ts';
+import { hasAvatar } from './avatar.ts';
 
 interface FamilyRow {
     id: string;
@@ -68,6 +69,7 @@ export function registerFamilyRoutes(
             name: r.name,
             role: r.role,
             shareMode: r.share_mode ?? 'sharing',
+            hasAvatar: hasAvatar(r.id),
             current:
                 r.lat !== null && r.recorded_at !== null
                     ? { lat: r.lat, lng: r.lng, accuracy: r.accuracy, battery: r.battery, recordedAt: r.recorded_at }
