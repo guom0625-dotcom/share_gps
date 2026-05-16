@@ -9,8 +9,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -45,8 +48,8 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
     private val activeViewers: MutableSet<String> = Collections.synchronizedSet(mutableSetOf())
     private val watchingTargets: MutableSet<String> = Collections.synchronizedSet(mutableSetOf())
 
-    var onActiveModeChanged: ((Boolean) -> Unit)? = null
-    var onNoWatchers: (() -> Unit)? = null
+    private val _isBeingWatched = MutableStateFlow(false)
+    val isBeingWatched: StateFlow<Boolean> = _isBeingWatched.asStateFlow()
 
     private val _locationUpdates = MutableSharedFlow<LocationUpdateMsg>(extraBufferCapacity = 50)
     val locationUpdates: SharedFlow<LocationUpdateMsg> = _locationUpdates.asSharedFlow()
@@ -57,7 +60,6 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
     @Volatile var myUserId: String? = null
         private set
     val isConnected: Boolean get() = ws != null
-    val isBeingWatched: Boolean get() = activeViewers.isNotEmpty()
 
     fun connect() {
         intentionalDisconnect = false
@@ -70,7 +72,7 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
         reconnectJob?.cancel()
         ws?.close(4001, "background")
         ws = null
-        activeViewers.clear()
+        applyWatcherChange { clear() }
     }
 
     fun sendRaw(json: String) {
@@ -85,6 +87,13 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
     fun watchStop(targetUserId: String) {
         watchingTargets.remove(targetUserId)
         sendRaw(JSONObject().put("type", "watch_stop").put("targetUserId", targetUserId).toString())
+    }
+
+    private fun applyWatcherChange(block: MutableSet<String>.() -> Unit) {
+        synchronized(activeViewers) {
+            activeViewers.block()
+            _isBeingWatched.value = activeViewers.isNotEmpty()
+        }
     }
 
     private fun scheduleReconnect(delayMs: Long = 5_000L) {
@@ -108,27 +117,29 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
                 when (json.optString("type")) {
                     "auth_ok" -> {
                         myUserId = json.optString("userId").takeIf { it.isNotEmpty() }
+                        // Server replays watching/no_watchers next — reset to avoid stale phantom watchers.
+                        applyWatcherChange { clear() }
                         for (targetId in watchingTargets) {
                             webSocket.send(JSONObject().put("type", "watch_start").put("targetUserId", targetId).toString())
                         }
                     }
                     "watching" -> {
                         val viewerId = json.optString("viewerUserId")
-                        Log.d("WS", "watching from $viewerId, viewers=${activeViewers.size+1}, cbSet=${onActiveModeChanged!=null}")
-                        if (viewerId.isNotEmpty() && activeViewers.add(viewerId)) {
-                            onActiveModeChanged?.invoke(true)
+                        if (viewerId.isNotEmpty()) {
+                            applyWatcherChange { add(viewerId) }
+                            Log.d("WS", "watching from $viewerId, viewers=${activeViewers.size}")
                         }
                     }
                     "watching_stop" -> {
                         val viewerId = json.optString("viewerUserId")
-                        activeViewers.remove(viewerId)
-                        Log.d("WS", "watching_stop from $viewerId, remaining=${activeViewers.size}, cbSet=${onActiveModeChanged!=null}")
-                        if (activeViewers.isEmpty()) onActiveModeChanged?.invoke(false)
+                        if (viewerId.isNotEmpty()) {
+                            applyWatcherChange { remove(viewerId) }
+                            Log.d("WS", "watching_stop from $viewerId, remaining=${activeViewers.size}")
+                        }
                     }
                     "no_watchers" -> {
-                        activeViewers.clear()
-                        Log.d("WS", "no_watchers, cbSet=${onNoWatchers!=null}")
-                        onNoWatchers?.invoke()
+                        applyWatcherChange { clear() }
+                        Log.d("WS", "no_watchers")
                     }
                     "location_update" -> {
                         _locationUpdates.tryEmit(
@@ -148,17 +159,19 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+            // Keep activeViewers as-is: server replays watching/no_watchers on re-auth.
             ws = null
-            activeViewers.clear()
-            onActiveModeChanged?.invoke(false)
             scheduleReconnect()
         }
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
             ws = null
-            activeViewers.clear()
-            onActiveModeChanged?.invoke(false)
-            if (code < 4000) scheduleReconnect()
+            if (code < 4000) {
+                // Transient: server replays state on re-auth, don't drop watchers.
+                scheduleReconnect()
+            } else {
+                applyWatcherChange { clear() }
+            }
         }
     }
 }

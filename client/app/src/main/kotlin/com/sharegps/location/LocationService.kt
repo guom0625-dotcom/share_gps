@@ -99,20 +99,14 @@ class LocationService : Service() {
         dao = AppDatabase.get(this).locationQueueDao()
 
         wsClient = WebSocketClient.get(this)?.also { ws ->
-            ws.onActiveModeChanged = { active ->
-                Log.d("LocSvc", "onActiveModeChanged active=$active prev=$activeMode isFg=$isForeground")
-                if (active != activeMode) {
-                    activeMode = active
-                    restartLocationUpdates()
-                    updateNotification()
-                }
-            }
-            ws.onNoWatchers = {
-                Log.d("LocSvc", "onNoWatchers")
-                if (activeMode) {
-                    activeMode = false
-                    restartLocationUpdates()
-                    updateNotification()
+            scope.launch {
+                ws.isBeingWatched.collect { watched ->
+                    Log.d("LocSvc", "isBeingWatched=$watched prev=$activeMode isFg=$isForeground")
+                    if (watched != activeMode) {
+                        activeMode = watched
+                        restartLocationUpdates()
+                        updateNotification()
+                    }
                 }
             }
             if (!ws.isConnected) ws.connect()
@@ -243,8 +237,6 @@ class LocationService : Service() {
         transitionPendingIntent?.let {
             ActivityRecognition.getClient(this).removeActivityTransitionUpdates(it)
         }
-        wsClient?.onActiveModeChanged = null
-        wsClient?.onNoWatchers = null
         scope.cancel()
         super.onDestroy()
     }

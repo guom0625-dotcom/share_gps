@@ -134,7 +134,6 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(onClick = vm::load, enabled = !loading) { Text("새로고침") }
             } else {
                 val memberName = members.find { it.id == historyMemberId }?.name ?: ""
                 Text(
