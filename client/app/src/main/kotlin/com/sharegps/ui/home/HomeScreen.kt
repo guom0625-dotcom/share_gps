@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Battery6Bar
 import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -90,16 +91,29 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun HomeScreen(vm: HomeViewModel = viewModel()) {
-    val members          by vm.members.collectAsState()
-    val positions        by vm.positions.collectAsState()
-    val selectedId       by vm.selectedId.collectAsState()
-    val loading          by vm.loading.collectAsState()
-    val error            by vm.error.collectAsState()
-    val avatars          by vm.avatars.collectAsState()
-    val historyMemberId   by vm.historyMemberId.collectAsState()
-    val historyActiveDays by vm.historyActiveDays.collectAsState()
-    val historyDaysLoading by vm.historyDaysLoading.collectAsState()
-    val historyPath       by vm.historyPath.collectAsState()
+    val members               by vm.members.collectAsState()
+    val positions             by vm.positions.collectAsState()
+    val selectedId            by vm.selectedId.collectAsState()
+    val loading               by vm.loading.collectAsState()
+    val error                 by vm.error.collectAsState()
+    val avatars               by vm.avatars.collectAsState()
+    val historyMemberId       by vm.historyMemberId.collectAsState()
+    val historyActiveDays     by vm.historyActiveDays.collectAsState()
+    val historyDaysLoading    by vm.historyDaysLoading.collectAsState()
+    val historyPath           by vm.historyPath.collectAsState()
+    val lowBatteryConfirmTarget by vm.lowBatteryConfirmTarget.collectAsState()
+
+    lowBatteryConfirmTarget?.let { targetId ->
+        val memberName = members.find { it.id == targetId }?.name ?: "상대방"
+        val battery = positions[targetId]?.battery
+        AlertDialog(
+            onDismissRequest = vm::dismissLowBatteryConfirm,
+            title = { Text("배터리 부족 경고") },
+            text = { Text("${memberName}의 배터리가 ${battery}%입니다.\n실시간 추적을 시작하면 배터리가 빠르게 소모될 수 있습니다. 계속할까요?") },
+            confirmButton = { TextButton(onClick = { vm.confirmWatch(targetId) }) { Text("계속") } },
+            dismissButton = { TextButton(onClick = vm::dismissLowBatteryConfirm) { Text("취소") } },
+        )
+    }
 
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {

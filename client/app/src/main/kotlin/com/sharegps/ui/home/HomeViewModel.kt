@@ -137,9 +137,32 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private val _lowBatteryConfirmTarget = MutableStateFlow<String?>(null)
+    val lowBatteryConfirmTarget: StateFlow<String?> = _lowBatteryConfirmTarget
+
     fun selectMember(memberId: String) {
         val prev = _selectedId.value
         val next = if (prev == memberId) null else memberId
+        if (next != null && next != myId) {
+            val battery = _positions.value[next]?.battery
+            if (battery != null && battery <= 20) {
+                _lowBatteryConfirmTarget.value = memberId
+                return
+            }
+        }
+        applySelection(prev, next)
+    }
+
+    fun confirmWatch(memberId: String) {
+        _lowBatteryConfirmTarget.value = null
+        applySelection(_selectedId.value, memberId)
+    }
+
+    fun dismissLowBatteryConfirm() {
+        _lowBatteryConfirmTarget.value = null
+    }
+
+    private fun applySelection(prev: String?, next: String?) {
         _selectedId.value = next
         val ws = WebSocketClient.get(getApplication()) ?: return
         if (next != null && next != myId) ws.watchStart(next)
