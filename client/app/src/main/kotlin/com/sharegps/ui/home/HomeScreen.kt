@@ -387,18 +387,19 @@ private fun FamilyMapView(
 
     LaunchedEffect(pathCoords, naverMap) {
         val map = naverMap ?: return@LaunchedEffect
-        if (pathCoords.isEmpty()) {
-            polyline.map = null
-        } else {
-            polyline.coords = pathCoords
-            polyline.color  = 0xCC1E88E5.toInt()
-            polyline.width  = 10
-            if (polyline.map == null) polyline.map = map
-            val bounds = if (pathCoords.size == 1)
-                LatLngBounds(pathCoords.first(), pathCoords.first())
-            else
-                LatLngBounds.Builder().include(pathCoords).build()
-            map.moveCamera(CameraUpdate.fitBounds(bounds, 100))
+        when {
+            pathCoords.size >= 2 -> {
+                polyline.coords = pathCoords
+                polyline.color  = 0xCC1E88E5.toInt()
+                polyline.width  = 10
+                if (polyline.map == null) polyline.map = map
+                map.moveCamera(CameraUpdate.fitBounds(LatLngBounds.Builder().include(pathCoords).build(), 100))
+            }
+            pathCoords.size == 1 -> {
+                polyline.map = null
+                map.moveCamera(CameraUpdate.scrollAndZoomTo(pathCoords.first(), 15.0))
+            }
+            else -> polyline.map = null
         }
     }
 
