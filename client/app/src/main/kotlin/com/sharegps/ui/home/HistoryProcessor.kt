@@ -25,13 +25,22 @@ sealed class PathEvent {
 private fun cleanPoints(points: List<HistoryPoint>): List<HistoryPoint> {
     val filtered = points.filter { it.accuracy == null || it.accuracy <= 80.0 }
     if (filtered.isEmpty()) return emptyList()
-    val result = mutableListOf(filtered.first())
+
+    // Speed filter: drop teleport noise (>200 km/h)
+    val speedOk = mutableListOf(filtered.first())
     for (k in 1 until filtered.size) {
-        val prev = result.last()
+        val prev = speedOk.last()
         val curr = filtered[k]
         val distM   = haversineM(prev.lat, prev.lng, curr.lat, curr.lng)
         val timeSec = (curr.recordedAt - prev.recordedAt) / 1000.0
-        if (timeSec <= 0 || distM / timeSec <= 55.0) result.add(curr)
+        if (timeSec <= 0 || distM / timeSec <= 55.0) speedOk.add(curr)
+    }
+
+    // Distance dedup: collapse GPS drift — keep only points >= 50 m from the last kept point
+    val result = mutableListOf(speedOk.first())
+    for (point in speedOk.drop(1)) {
+        val prev = result.last()
+        if (haversineM(prev.lat, prev.lng, point.lat, point.lng) >= 50.0) result.add(point)
     }
     return result
 }
