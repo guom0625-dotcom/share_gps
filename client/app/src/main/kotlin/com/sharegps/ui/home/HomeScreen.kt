@@ -1,5 +1,6 @@
 package com.sharegps.ui.home
 
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.os.Bundle
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -39,6 +41,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -62,6 +65,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -124,6 +128,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
     }
 
     val context = LocalContext.current
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         uri?.let { u ->
             val bytes = context.contentResolver.openInputStream(u)?.readBytes() ?: return@let
@@ -131,96 +136,123 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (historyMemberId == null) {
-                Text(
-                    text = "가족 위치",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
-                )
-            } else {
-                val memberName = members.find { it.id == historyMemberId }?.name ?: ""
-                Text(
-                    text = "$memberName 이동 이력",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
-                )
-                TextButton(onClick = vm::exitHistory) { Text("돌아가기") }
+    // 멤버 리스트 패널 (portrait: 상단, landscape: 좌측)
+    val listPanel: @Composable (Modifier) -> Unit = { modifier ->
+        Column(modifier = modifier) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (historyMemberId == null) {
+                    Text(
+                        text = "가족 위치",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                } else {
+                    val memberName = members.find { it.id == historyMemberId }?.name ?: ""
+                    Text(
+                        text = "$memberName 이동 이력",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = vm::exitHistory) { Text("돌아가기") }
+                }
             }
-        }
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .then(
-                    if (historyMemberId == null) Modifier.heightIn(min = 72.dp, max = 216.dp)
-                    else Modifier
-                ),
-        ) {
-            when {
-                historyMemberId != null -> HistoryCalendar(
-                    activeDays    = historyActiveDays,
-                    daysLoading   = historyDaysLoading,
-                    onDaySelect   = { y, m, d -> vm.loadHistoryDate(historyMemberId!!, y, m, d) },
-                    onMonthChange = { y, m -> vm.loadActiveDays(historyMemberId!!, y, m) },
-                    modifier      = Modifier.fillMaxWidth(),
-                )
-                loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                members.isEmpty() -> Text(
-                    "가족 구성원이 없습니다",
-                    modifier = Modifier.align(Alignment.Center),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(members, key = { it.id }) { member ->
-                        MemberRow(
-                            member      = member,
-                            position    = positions[member.id],
-                            selected    = member.id == selectedId,
-                            isMe        = member.id == vm.myId,
-                            avatar      = avatars[member.id],
-                            now         = now,
-                            onClick     = { vm.selectMember(member.id) },
-                            onLongClick = { vm.enterHistory(member.id) },
-                            onPickPhoto = {
-                                photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                            },
-                        )
-                        HorizontalDivider(modifier = Modifier.fillMaxWidth())
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (!isLandscape && historyMemberId == null)
+                            Modifier.heightIn(min = 72.dp, max = 216.dp)
+                        else
+                            Modifier.weight(1f)
+                    ),
+            ) {
+                when {
+                    historyMemberId != null -> HistoryCalendar(
+                        activeDays    = historyActiveDays,
+                        daysLoading   = historyDaysLoading,
+                        onDaySelect   = { y, m, d -> vm.loadHistoryDate(historyMemberId!!, y, m, d) },
+                        onMonthChange = { y, m -> vm.loadActiveDays(historyMemberId!!, y, m) },
+                        modifier      = Modifier.fillMaxWidth(),
+                    )
+                    loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    members.isEmpty() -> Text(
+                        "가족 구성원이 없습니다",
+                        modifier = Modifier.align(Alignment.Center),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        items(members, key = { it.id }) { member ->
+                            MemberRow(
+                                member      = member,
+                                position    = positions[member.id],
+                                selected    = member.id == selectedId,
+                                isMe        = member.id == vm.myId,
+                                avatar      = avatars[member.id],
+                                now         = now,
+                                onClick     = { vm.selectMember(member.id) },
+                                onLongClick = { vm.enterHistory(member.id) },
+                                onPickPhoto = {
+                                    photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                },
+                            )
+                            HorizontalDivider(modifier = Modifier.fillMaxWidth())
+                        }
                     }
                 }
             }
-        }
 
-        error?.let {
-            Text(
-                text     = "오류: $it",
-                color    = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            error?.let {
+                Text(
+                    text     = "오류: $it",
+                    color    = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
+        }
+    }
+
+    if (isLandscape) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+        ) {
+            listPanel(Modifier.fillMaxHeight().weight(0.38f))
+            VerticalDivider(thickness = 2.dp)
+            FamilyMapView(
+                members     = members,
+                positions   = positions,
+                selectedId  = selectedId,
+                avatars     = avatars,
+                historyPath = historyPath,
+                myId        = vm.myId,
+                modifier    = Modifier.weight(0.62f),
             )
         }
-
-        HorizontalDivider(thickness = 2.dp)
-
-        FamilyMapView(
-            members     = members,
-            positions   = positions,
-            selectedId  = selectedId,
-            avatars     = avatars,
-            historyPath = historyPath,
-            myId        = vm.myId,
-            modifier    = Modifier.weight(1f),
-        )
+    } else {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+        ) {
+            listPanel(Modifier.fillMaxWidth())
+            HorizontalDivider(thickness = 2.dp)
+            FamilyMapView(
+                members     = members,
+                positions   = positions,
+                selectedId  = selectedId,
+                avatars     = avatars,
+                historyPath = historyPath,
+                myId        = vm.myId,
+                modifier    = Modifier.weight(1f),
+            )
+        }
     }
 }
 
