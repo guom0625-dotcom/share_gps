@@ -22,28 +22,45 @@ sealed class PathEvent {
     ) : PathEvent()
 }
 
+private fun cleanPoints(points: List<HistoryPoint>): List<HistoryPoint> {
+    val filtered = points.filter { it.accuracy == null || it.accuracy <= 80.0 }
+    if (filtered.isEmpty()) return emptyList()
+    val result = mutableListOf(filtered.first())
+    for (k in 1 until filtered.size) {
+        val prev = result.last()
+        val curr = filtered[k]
+        val distM   = haversineM(prev.lat, prev.lng, curr.lat, curr.lng)
+        val timeSec = (curr.recordedAt - prev.recordedAt) / 1000.0
+        if (timeSec <= 0 || distM / timeSec <= 55.0) result.add(curr)
+    }
+    return result
+}
+
+fun filterHistoryPath(points: List<HistoryPoint>): List<HistoryPoint> = cleanPoints(points)
+
 fun processHistoryPath(points: List<HistoryPoint>): List<PathEvent> {
-    if (points.isEmpty()) return emptyList()
+    val cleaned = cleanPoints(points)
+
     val stayRadiusM = 150.0
     val stayMinMs   = 10 * 60_000L
     val events = mutableListOf<PathEvent>()
     var i = 0
-    while (i < points.size) {
-        val anchor = points[i]
+    while (i < cleaned.size) {
+        val anchor = cleaned[i]
         var j = i + 1
-        while (j < points.size &&
-               haversineM(anchor.lat, anchor.lng, points[j].lat, points[j].lng) <= stayRadiusM) {
+        while (j < cleaned.size &&
+               haversineM(anchor.lat, anchor.lng, cleaned[j].lat, cleaned[j].lng) <= stayRadiusM) {
             j++
         }
         val endIdx   = j - 1
-        val duration = points[endIdx].recordedAt - anchor.recordedAt
+        val duration = cleaned[endIdx].recordedAt - anchor.recordedAt
         if (duration >= stayMinMs && j > i + 2) {
-            val sub = points.subList(i, j)
+            val sub = cleaned.subList(i, j)
             events.add(PathEvent.Stay(
                 lat    = sub.map { it.lat }.average(),
                 lng    = sub.map { it.lng }.average(),
                 fromMs = anchor.recordedAt,
-                toMs   = points[endIdx].recordedAt,
+                toMs   = cleaned[endIdx].recordedAt,
             ))
             i = j
         } else {

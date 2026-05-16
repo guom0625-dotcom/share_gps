@@ -358,6 +358,7 @@ private fun FamilyMapView(
     val timeMarkers = remember { mutableMapOf<Int, Marker>() }
     val transitDot  = remember { createTransitDot() }
     val stayDot     = remember { createStayDot() }
+    val pathCoords  = remember(historyPath) { filterHistoryPath(historyPath).map { LatLng(it.lat, it.lng) } }
     val pathEvents  = remember(historyPath) { processHistoryPath(historyPath) }
 
     DisposableEffect(lifecycle) {
@@ -384,20 +385,19 @@ private fun FamilyMapView(
         onDispose { lifecycle.removeObserver(observer) }
     }
 
-    LaunchedEffect(historyPath, naverMap) {
+    LaunchedEffect(pathCoords, naverMap) {
         val map = naverMap ?: return@LaunchedEffect
-        if (historyPath.isEmpty()) {
+        if (pathCoords.isEmpty()) {
             polyline.map = null
         } else {
-            val coords = historyPath.map { LatLng(it.lat, it.lng) }
-            polyline.coords = coords
+            polyline.coords = pathCoords
             polyline.color  = 0xCC1E88E5.toInt()
             polyline.width  = 10
             if (polyline.map == null) polyline.map = map
-            val bounds = if (coords.size == 1)
-                LatLngBounds(coords.first(), coords.first())
+            val bounds = if (pathCoords.size == 1)
+                LatLngBounds(pathCoords.first(), pathCoords.first())
             else
-                LatLngBounds.Builder().include(coords).build()
+                LatLngBounds.Builder().include(pathCoords).build()
             map.moveCamera(CameraUpdate.fitBounds(bounds, 100))
         }
     }
@@ -428,16 +428,7 @@ private fun FamilyMapView(
                     m.subCaptionTextSize = 10f
                     m.subCaptionColor = 0xFF616161.toInt()
                 }
-                is PathEvent.Transit -> {
-                    m.position    = LatLng(event.lat, event.lng)
-                    m.icon        = OverlayImage.fromBitmap(transitDot)
-                    m.width       = transitDot.width
-                    m.height      = transitDot.height
-                    m.captionText = formatTime(event.timeMs)
-                    m.subCaptionText = speedLabel(event.speed)
-                    m.subCaptionTextSize = 10f
-                    m.subCaptionColor = 0xFF424242.toInt()
-                }
+                is PathEvent.Transit -> continue
             }
             m.map = map
             timeMarkers[idx] = m
