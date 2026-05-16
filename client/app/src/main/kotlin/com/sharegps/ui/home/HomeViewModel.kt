@@ -62,18 +62,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private var watchJob: Job? = null
 
     private val appLifecycleObserver = object : DefaultLifecycleObserver {
-        override fun onStop(owner: LifecycleOwner) {
-            _selectedId.value?.takeIf { it != myId }?.let {
-                WebSocketClient.get(getApplication())?.watchStop(it)
-            }
-        }
         override fun onStart(owner: LifecycleOwner) {
-            if (_members.value.isNotEmpty()) {
-                refresh()
-                _selectedId.value?.takeIf { it != myId }?.let {
-                    WebSocketClient.get(getApplication())?.watchStart(it)
-                }
-            }
+            if (_members.value.isNotEmpty()) refresh()
             startLocationUpdatesJob()
         }
     }

@@ -80,13 +80,14 @@ class LocationService : Service() {
             Log.d("LocSvc", "fgObserver.onStart isFg=$isForeground→true activeMode=$activeMode")
             isForeground = true
             requestFreshFix()
-            restartLocationUpdates(activeMode)
+            restartLocationUpdates()
+            updateNotification()
         }
         override fun onStop(owner: LifecycleOwner) {
             Log.d("LocSvc", "fgObserver.onStop isFg=$isForeground→false activeMode=$activeMode")
             isForeground = false
-            restartLocationUpdates(activeMode)
-            if (!activeMode) stopAndExit()
+            restartLocationUpdates()
+            updateNotification()
         }
     }
 
@@ -102,13 +103,18 @@ class LocationService : Service() {
                 Log.d("LocSvc", "onActiveModeChanged active=$active prev=$activeMode isFg=$isForeground")
                 if (active != activeMode) {
                     activeMode = active
-                    restartLocationUpdates(active)
-                    if (!active) { Log.d("LocSvc", "stopAndExit via onActiveModeChanged"); stopAndExit() }
-                } else {
-                    Log.d("LocSvc", "onActiveModeChanged SKIPPED (same value)")
+                    restartLocationUpdates()
+                    updateNotification()
                 }
             }
-            ws.onNoWatchers = { Log.d("LocSvc", "onNoWatchers → stopAndExit"); stopAndExit() }
+            ws.onNoWatchers = {
+                Log.d("LocSvc", "onNoWatchers")
+                if (activeMode) {
+                    activeMode = false
+                    restartLocationUpdates()
+                    updateNotification()
+                }
+            }
             if (!ws.isConnected) ws.connect()
         }
 
@@ -119,10 +125,10 @@ class LocationService : Service() {
             this, NOTIF_ID, buildNotification(),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
         )
-        requestLocationUpdates(false)
+        restartLocationUpdates()
         scope.launch {
             MotionState.isStill.drop(1).collect {
-                restartLocationUpdates(activeMode)
+                restartLocationUpdates()
                 updateNotification()
             }
         }
@@ -193,19 +199,22 @@ class LocationService : Service() {
     }
 
     @Synchronized
-    private fun restartLocationUpdates(active: Boolean) {
+    private fun restartLocationUpdates() {
         locationCallback?.let { fusedClient.removeLocationUpdates(it) }
         locationCallback = null
-        if (!active && !isForeground && MotionState.isStill.value) return
-        requestLocationUpdates(active)
-        updateNotification()
+        val highAccuracy = activeMode || isForeground
+        if (!highAccuracy && MotionState.isStill.value) {
+            Log.d("LocSvc", "restartLocationUpdates: idle+still, suspending GPS")
+            return
+        }
+        Log.d("LocSvc", "restartLocationUpdates: highAccuracy=$highAccuracy (active=$activeMode fg=$isForeground)")
+        requestLocationUpdates(highAccuracy)
     }
 
-    private fun requestLocationUpdates(active: Boolean) {
+    private fun requestLocationUpdates(highAccuracy: Boolean) {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
             != PackageManager.PERMISSION_GRANTED) return
 
-        val highAccuracy = active
         val req = LocationRequest.Builder(
             if (highAccuracy) Priority.PRIORITY_HIGH_ACCURACY else Priority.PRIORITY_BALANCED_POWER_ACCURACY,
             if (highAccuracy) 5_000L else 600_000L,
@@ -224,16 +233,8 @@ class LocationService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Service already running — reconnect WS if it was intentionally disconnected (e.g. zombie state)
         wsClient?.takeIf { !it.isConnected }?.connect()
-        return START_NOT_STICKY
-    }
-
-    private fun stopAndExit() {
-        Log.d("LocSvc", "stopAndExit called activeMode=$activeMode isFg=$isForeground")
-        wsClient?.disconnect()
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
+        return START_STICKY
     }
 
     override fun onDestroy() {
@@ -258,10 +259,12 @@ class LocationService : Service() {
         getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(NOTIF_CHANNEL, "위치 공유", NotificationManager.IMPORTANCE_LOW)
         )
+        val highAccuracy = activeMode || isForeground
+        val suspended = !highAccuracy && MotionState.isStill.value
         val status = when {
-            activeMode                -> "실시간 공유 중"
-            MotionState.isStill.value -> "정지 감지 — GPS 일시 중단"
-            else                      -> "위치 공유 중"
+            activeMode -> "실시간 공유 중"
+            suspended  -> "정지 감지 — GPS 일시 중단"
+            else       -> "위치 공유 중"
         }
         return NotificationCompat.Builder(this, NOTIF_CHANNEL)
             .setContentTitle(status)

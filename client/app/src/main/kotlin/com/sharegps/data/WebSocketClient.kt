@@ -71,7 +71,6 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
         ws?.close(4001, "background")
         ws = null
         activeViewers.clear()
-        onActiveModeChanged?.invoke(false)
     }
 
     fun sendRaw(json: String) {

@@ -128,10 +128,19 @@ export function registerWsServer(app: FastifyInstance, db: Db): void {
                     }
                     break;
                 }
-                case 'watch_stop':
-                    console.log(`[ws] watch_stop from ${userId} → ${msg.data.targetUserId}`);
-                    sessions.watchStop(userId, msg.data.targetUserId);
+                case 'watch_stop': {
+                    const targetId = msg.data.targetUserId;
+                    console.log(`[ws] watch_stop from ${userId} → ${targetId}`);
+                    sessions.watchStop(userId, targetId);
+                    // Wake B via FCM in case WS dropped silently while B was in background.
+                    // B will re-auth, receive watching/no_watchers, and downgrade its GPS mode.
+                    const row = getFcmToken.get(targetId) as { fcm_token: string | null } | undefined;
+                    if (row?.fcm_token) {
+                        console.log(`[fcm] sending watch_stop to ${targetId}`);
+                        void sendFcmToToken(row.fcm_token, { type: 'watch_stop' });
+                    }
                     break;
+                }
                 case 'ping':
                     send({ type: 'pong' });
                     break;

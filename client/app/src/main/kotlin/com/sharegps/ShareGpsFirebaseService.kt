@@ -24,7 +24,7 @@ class ShareGpsFirebaseService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         when (message.data["type"]) {
-            "watch_start" -> LocationService.start(applicationContext)
+            "watch_start", "watch_stop" -> LocationService.start(applicationContext)
         }
     }
 }
