@@ -166,10 +166,11 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .then(
-                        if (!isLandscape && historyMemberId == null)
-                            Modifier.heightIn(min = 72.dp, max = 216.dp)
-                        else
-                            Modifier.weight(1f)
+                        when {
+                            isLandscape                -> Modifier.weight(1f)
+                            historyMemberId == null    -> Modifier.heightIn(min = 72.dp, max = 216.dp)
+                            else                       -> Modifier
+                        }
                     ),
             ) {
                 when {
