@@ -1,5 +1,19 @@
 module.exports = {
-  apps: [{
+  apps: [
+  {
+    name: 'caddy',
+    script: '/usr/local/bin/caddy',
+    args: 'run --config /root/projects/share_gps/server/Caddyfile',
+    cwd: '/root/projects/share_gps/server',
+    interpreter: 'none',
+    watch: false,
+    restart_delay: 1000,
+    max_restarts: 10,
+    log_file: './logs/caddy.log',
+    error_file: './logs/caddy-error.log',
+    out_file: './logs/caddy-out.log',
+  },
+  {
     name: 'share-gps',
     script: 'src/index.ts',
     interpreter: 'node',
