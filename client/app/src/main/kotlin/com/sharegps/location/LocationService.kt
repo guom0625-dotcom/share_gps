@@ -205,7 +205,7 @@ class LocationService : Service() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
             != PackageManager.PERMISSION_GRANTED) return
 
-        val highAccuracy = active || isForeground
+        val highAccuracy = active
         val req = LocationRequest.Builder(
             if (highAccuracy) Priority.PRIORITY_HIGH_ACCURACY else Priority.PRIORITY_BALANCED_POWER_ACCURACY,
             if (highAccuracy) 5_000L else 600_000L,
@@ -223,7 +223,11 @@ class LocationService : Service() {
         fusedClient.requestLocationUpdates(req, cb, Looper.getMainLooper())
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_NOT_STICKY
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Service already running — reconnect WS if it was intentionally disconnected (e.g. zombie state)
+        wsClient?.takeIf { !it.isConnected }?.connect()
+        return START_NOT_STICKY
+    }
 
     private fun stopAndExit() {
         Log.d("LocSvc", "stopAndExit called activeMode=$activeMode isFg=$isForeground")
@@ -255,9 +259,9 @@ class LocationService : Service() {
             NotificationChannel(NOTIF_CHANNEL, "위치 공유", NotificationManager.IMPORTANCE_LOW)
         )
         val status = when {
-            activeMode || isForeground -> "실시간 공유 중"
-            MotionState.isStill.value  -> "정지 감지 — GPS 일시 중단"
-            else                       -> "위치 공유 중"
+            activeMode                -> "실시간 공유 중"
+            MotionState.isStill.value -> "정지 감지 — GPS 일시 중단"
+            else                      -> "위치 공유 중"
         }
         return NotificationCompat.Builder(this, NOTIF_CHANNEL)
             .setContentTitle(status)
