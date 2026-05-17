@@ -4,6 +4,7 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.sharegps.data.ApiRepository
 import com.sharegps.data.KeyStore
+import com.sharegps.data.WebSocketClient
 import com.sharegps.data.resolveServerUrl
 import com.sharegps.location.LocationService
 import kotlinx.coroutines.CoroutineScope
@@ -24,7 +25,11 @@ class ShareGpsFirebaseService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         when (message.data["type"]) {
-            "watch_start", "watch_stop" -> LocationService.start(applicationContext)
+            "watch_start", "watch_stop" -> {
+                LocationService.start(applicationContext)
+                // 좀비 WS 강제 재연결 — 서버가 watching/no_watchers를 replay하도록
+                WebSocketClient.get(applicationContext)?.forceReconnect()
+            }
         }
     }
 }

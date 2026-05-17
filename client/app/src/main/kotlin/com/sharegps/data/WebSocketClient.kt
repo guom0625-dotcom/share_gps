@@ -1,6 +1,8 @@
 package com.sharegps.data
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
 import android.util.Log
 import com.sharegps.BuildConfig
 import kotlinx.coroutines.CoroutineScope
@@ -24,7 +26,11 @@ import org.json.JSONObject
 import java.util.Collections
 import java.util.concurrent.TimeUnit
 
-class WebSocketClient private constructor(serverUrl: String, private val apiKey: String) {
+class WebSocketClient private constructor(
+    context: Context,
+    serverUrl: String,
+    private val apiKey: String,
+) {
 
     companion object {
         @Volatile private var instance: WebSocketClient? = null
@@ -33,11 +39,12 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
             instance?.let { return it }
             val key = KeyStore(context).getKey() ?: return null
             return synchronized(this) {
-                instance ?: WebSocketClient(resolveServerUrl(context), key).also { instance = it }
+                instance ?: WebSocketClient(context.applicationContext, resolveServerUrl(context), key).also { instance = it }
             }
         }
     }
 
+    private val appContext = context.applicationContext
     private val wsUrl = serverUrl.replace("https://", "wss://").replace("http://", "ws://") + "/ws"
 
     private val okClient = OkHttpClient.Builder()
@@ -61,10 +68,30 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
         private set
     val isConnected: Boolean get() = ws != null
 
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            Log.d("WS", "network onAvailable → forceReconnect")
+            forceReconnect()
+        }
+    }
+
+    init {
+        appContext.getSystemService(ConnectivityManager::class.java)
+            ?.registerDefaultNetworkCallback(networkCallback)
+    }
+
     fun connect() {
         intentionalDisconnect = false
         if (ws != null) return
         ws = okClient.newWebSocket(Request.Builder().url(wsUrl).build(), listener)
+    }
+
+    @Synchronized
+    fun forceReconnect() {
+        intentionalDisconnect = false
+        val old = ws
+        ws = okClient.newWebSocket(Request.Builder().url(wsUrl).build(), listener)
+        try { old?.close(4002, "force reconnect") } catch (_: Exception) {}
     }
 
     fun disconnect() {
@@ -75,9 +102,7 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
         applyWatcherChange { clear() }
     }
 
-    fun sendRaw(json: String) {
-        ws?.send(json)
-    }
+    fun sendRaw(json: String): Boolean = ws?.send(json) ?: false
 
     fun watchStart(targetUserId: String) {
         watchingTargets.add(targetUserId)
@@ -159,12 +184,16 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+            // Stale socket from forceReconnect — ignore, new socket already in place.
+            if (ws !== webSocket) return
             // Keep activeViewers as-is: server replays watching/no_watchers on re-auth.
             ws = null
             scheduleReconnect()
         }
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+            // Stale socket from forceReconnect — ignore.
+            if (ws !== webSocket) return
             ws = null
             if (code < 4000) {
                 // Transient: server replays state on re-auth, don't drop watchers.

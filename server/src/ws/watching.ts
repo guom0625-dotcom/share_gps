@@ -26,7 +26,9 @@ export class WatchingSession {
         this.connections.set(userId, socket);
     }
 
-    removeConnection(userId: string): void {
+    removeConnection(userId: string, socket: SocketLike): void {
+        const current = this.connections.get(userId);
+        if (current !== socket) return; // stale close handler — newer socket already in map
         this.connections.delete(userId);
         this._cleanupViewer(userId);
     }

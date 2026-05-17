@@ -153,11 +153,11 @@ export function registerWsServer(app: FastifyInstance, db: Db): void {
 
         socket.on('close', () => {
             clearTimeout(authTimeout);
-            if (userId) sessions.removeConnection(userId);
+            if (userId) sessions.removeConnection(userId, socket);
         });
 
         socket.on('error', () => {
-            if (userId) sessions.removeConnection(userId);
+            if (userId) sessions.removeConnection(userId, socket);
         });
     });
 }

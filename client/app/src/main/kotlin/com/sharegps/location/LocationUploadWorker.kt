@@ -16,6 +16,7 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.sharegps.data.ApiClient
+import com.sharegps.data.AppDatabase
 import com.sharegps.data.KeyStore
 import com.sharegps.data.LocationQueueEntity
 import com.sharegps.data.resolveServerUrl
@@ -28,14 +29,21 @@ class LocationUploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWo
 
     override suspend fun doWork(): Result {
         val key = KeyStore(applicationContext).getKey() ?: return Result.success()
-        val loc = getCurrentLocation() ?: return Result.success()
-        val battery = getBattery()
-        ApiClient(resolveServerUrl(applicationContext), key).uploadBatch(
-            listOf(LocationQueueEntity(
-                lat = loc.latitude, lng = loc.longitude,
-                accuracy = loc.accuracy, battery = battery, timestamp = loc.time,
-            ))
-        )
+        val dao = AppDatabase.get(applicationContext).locationQueueDao()
+        val pending = dao.getOldest()
+        val loc = getCurrentLocation()
+        val current = loc?.let {
+            LocationQueueEntity(
+                lat = it.latitude, lng = it.longitude,
+                accuracy = it.accuracy, battery = getBattery(), timestamp = it.time,
+            )
+        }
+        val batch = pending + listOfNotNull(current)
+        if (batch.isEmpty()) return Result.success()
+        val uploaded = ApiClient(resolveServerUrl(applicationContext), key).uploadBatch(batch)
+        if (uploaded && pending.isNotEmpty()) {
+            dao.deleteByIds(pending.map { it.id })
+        }
         return Result.success()
     }
 

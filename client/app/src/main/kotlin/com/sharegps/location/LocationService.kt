@@ -164,10 +164,6 @@ class LocationService : Service() {
         scope.launch {
             val battery = getBattery()
             val speed = if (loc.hasSpeed() && loc.speed > 0.5f) loc.speed.toDouble() else null
-            dao.insert(LocationQueueEntity(
-                lat = loc.latitude, lng = loc.longitude,
-                accuracy = loc.accuracy, battery = battery, timestamp = loc.time, speed = speed,
-            ))
             val json = JSONObject().apply {
                 put("type", "location")
                 put("lat", loc.latitude)
@@ -177,7 +173,14 @@ class LocationService : Service() {
                 battery?.let { put("battery", it) }
                 speed?.let   { put("speed", it) }
             }
-            wsClient?.sendRaw(json.toString())
+            // WS 전송 실패 시에만 큐에 적재 (WorkManager가 나중에 HTTP로 재전송)
+            val sent = wsClient?.sendRaw(json.toString()) ?: false
+            if (!sent) {
+                dao.insert(LocationQueueEntity(
+                    lat = loc.latitude, lng = loc.longitude,
+                    accuracy = loc.accuracy, battery = battery, timestamp = loc.time, speed = speed,
+                ))
+            }
             val myId = wsClient?.myUserId ?: ""
             OwnLocationBroadcast.flow.tryEmit(
                 LocationUpdateMsg(myId, loc.latitude, loc.longitude, loc.accuracy.toDouble(), battery, loc.time, speed)
