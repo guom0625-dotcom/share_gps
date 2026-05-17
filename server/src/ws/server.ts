@@ -101,6 +101,7 @@ export function registerWsServer(app: FastifyInstance, db: Db): void {
                 case 'location': {
                     const { lat, lng, accuracy, battery, recordedAt, speed } = msg.data;
                     const receivedAt = Date.now();
+                    console.log(`[ws] location from ${userId} recordedAt=${recordedAt} age=${receivedAt - recordedAt}ms`);
                     db.transaction(() => {
                         upsertCurrent.run(userId, lat, lng, accuracy ?? null, battery ?? null, recordedAt);
                         insertLoc.run(userId, lat, lng, accuracy ?? null, battery ?? null, speed ?? null, recordedAt, receivedAt);
