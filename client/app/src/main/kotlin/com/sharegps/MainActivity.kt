@@ -12,8 +12,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -35,12 +33,29 @@ import com.sharegps.update.AppUpdater
 import com.sharegps.update.UpdateChecker
 
 class MainActivity : ComponentActivity() {
+
+    private val updateTag = mutableStateOf<String?>(null)
+    private var lastUpdateCheckMs = 0L
+
     override fun onResume() {
         super.onResume()
         if (KeyStore(this).hasKey()) {
             LocationService.start(this)
             LocationUploadWorker.schedule(this)
             registerFcmToken()
+        }
+        checkForUpdate()
+    }
+
+    private fun checkForUpdate() {
+        val now = System.currentTimeMillis()
+        if (now - lastUpdateCheckMs < 30 * 60_000L) return
+        lastUpdateCheckMs = now
+        CoroutineScope(Dispatchers.IO).launch {
+            val latest = UpdateChecker.latestTag() ?: return@launch
+            if (UpdateChecker.isNewer(latest, BuildConfig.VERSION_NAME)) {
+                withContext(Dispatchers.Main) { updateTag.value = latest }
+            }
         }
     }
 
@@ -61,26 +76,20 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface {
-                    var updateTag by remember { mutableStateOf<String?>(null) }
-                    LaunchedEffect(Unit) {
-                        val latest = withContext(Dispatchers.IO) { UpdateChecker.latestTag() }
-                        if (latest != null && UpdateChecker.isNewer(latest, BuildConfig.VERSION_NAME)) {
-                            updateTag = latest
-                        }
-                    }
-                    updateTag?.let { tag ->
+                    val tag by updateTag
+                    tag?.let { t ->
                         AlertDialog(
-                            onDismissRequest = { updateTag = null },
+                            onDismissRequest = { updateTag.value = null },
                             title = { Text("업데이트 있음") },
-                            text  = { Text("새 버전 $tag 이 출시되었습니다.") },
+                            text  = { Text("새 버전 $t 이 출시되었습니다.") },
                             confirmButton = {
                                 TextButton(onClick = {
-                                    AppUpdater(this@MainActivity).download(tag)
-                                    updateTag = null
+                                    AppUpdater(applicationContext).download(t)
+                                    updateTag.value = null
                                 }) { Text("지금 업데이트") }
                             },
                             dismissButton = {
-                                TextButton(onClick = { updateTag = null }) { Text("나중에") }
+                                TextButton(onClick = { updateTag.value = null }) { Text("나중에") }
                             },
                         )
                     }
