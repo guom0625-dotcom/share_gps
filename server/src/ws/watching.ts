@@ -40,7 +40,9 @@ export class WatchingSession {
         if (!targetSet) { targetSet = new Set(); this.viewerTargets.set(viewerId, targetSet); }
         targetSet.add(targetId);
 
-        this.sendTo(targetId, { type: 'watching', viewerUserId: viewerId });
+        const sock = this.connections.get(targetId);
+        const sent = sock ? safeSend(sock, JSON.stringify({ type: 'watching', viewerUserId: viewerId })) : false;
+        console.log(`[ws] watching → ${targetId} sent=${sent} hasConn=${!!sock}`);
     }
 
     watchStop(viewerId: string, targetId: string): void {
@@ -54,7 +56,9 @@ export class WatchingSession {
             targetSet.delete(targetId);
             if (targetSet.size === 0) this.viewerTargets.delete(viewerId);
         }
-        this.sendTo(targetId, { type: 'watching_stop', viewerUserId: viewerId });
+        const sock = this.connections.get(targetId);
+        const sent = sock ? safeSend(sock, JSON.stringify({ type: 'watching_stop', viewerUserId: viewerId })) : false;
+        console.log(`[ws] watching_stop → ${targetId} sent=${sent} hasConn=${!!sock}`);
     }
 
     broadcastToWatchers(fromUserId: string, payload: object): void {

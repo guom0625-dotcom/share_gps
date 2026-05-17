@@ -82,14 +82,17 @@ export function registerWsServer(app: FastifyInstance, db: Db): void {
                 authed = true;
                 sessions.addConnection(userId, socket);
                 send({ type: 'auth_ok', userId: user.id, role: user.role });
+                console.log(`[ws] auth_ok ${userId}`);
                 // Re-send current watchers (for FCM-woken reconnects)
                 const watchers = sessions.getWatchersOf(userId);
                 if (watchers.length > 0) {
                     for (const viewerId of watchers) {
                         send({ type: 'watching', viewerUserId: viewerId });
                     }
+                    console.log(`[ws] replay watching to ${userId}: viewers=${watchers.join(',')}`);
                 } else {
                     send({ type: 'no_watchers' });
+                    console.log(`[ws] replay no_watchers to ${userId}`);
                 }
                 return;
             }
