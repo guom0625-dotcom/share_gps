@@ -7,8 +7,10 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.viewModelScope
+import com.sharegps.BuildConfig
 import com.sharegps.data.ApiRepository
 import com.sharegps.data.FamilyMember
+import com.sharegps.data.GeocodingRepository
 import com.sharegps.data.HistoryPoint
 import com.sharegps.data.KeyStore
 import com.sharegps.data.LocationUpdateMsg
@@ -26,6 +28,7 @@ import java.time.ZoneId
 
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ApiRepository(resolveServerUrl(app), KeyStore(app).getKey() ?: "")
+    private val geocoding = GeocodingRepository(BuildConfig.NAVER_MAPS_CLIENT_ID, BuildConfig.NAVER_GEOCODING_SECRET)
 
     private val _members = MutableStateFlow<List<FamilyMember>>(emptyList())
     val members: StateFlow<List<FamilyMember>> = _members
@@ -57,32 +60,27 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val _historyPath = MutableStateFlow<List<HistoryPoint>>(emptyList())
     val historyPath: StateFlow<List<HistoryPoint>> = _historyPath
 
+    private val _historyEvents = MutableStateFlow<List<PathEvent>>(emptyList())
+    val historyEvents: StateFlow<List<PathEvent>> = _historyEvents
+
+    private val _historyPlaceNames = MutableStateFlow<Map<Int, String>>(emptyMap())
+    val historyPlaceNames: StateFlow<Map<Int, String>> = _historyPlaceNames
+
     var myId: String? = null
         private set
     private var watchJob: Job? = null
-    private var bgWatchStopJob: Job? = null
-    private var watchStopSent = false
 
     private val appLifecycleObserver = object : DefaultLifecycleObserver {
         override fun onStart(owner: LifecycleOwner) {
-            bgWatchStopJob?.cancel()
-            bgWatchStopJob = null
-            if (watchStopSent) {
-                watchStopSent = false
-                _selectedId.value?.takeIf { it != myId }?.let {
-                    WebSocketClient.get(getApplication())?.watchStart(it)
-                }
-            }
             if (_members.value.isNotEmpty()) refresh()
             startLocationUpdatesJob()
+            _selectedId.value?.takeIf { it != myId }?.let {
+                WebSocketClient.get(getApplication())?.watchStart(it)
+            }
         }
         override fun onStop(owner: LifecycleOwner) {
-            bgWatchStopJob = viewModelScope.launch {
-                delay(120_000L)  // 2분 이상 백그라운드일 때만 watch_stop
-                watchStopSent = true
-                _selectedId.value?.takeIf { it != myId }?.let {
-                    WebSocketClient.get(getApplication())?.watchStop(it)
-                }
+            _selectedId.value?.takeIf { it != myId }?.let {
+                WebSocketClient.get(getApplication())?.watchStop(it)
             }
         }
     }
@@ -199,10 +197,14 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _historyMemberId.value = null
         _historyActiveDays.value = emptySet()
         _historyPath.value = emptyList()
+        _historyEvents.value = emptyList()
+        _historyPlaceNames.value = emptyMap()
     }
 
     fun loadActiveDays(memberId: String, year: Int, month: Int) {
         _historyPath.value = emptyList()
+        _historyEvents.value = emptyList()
+        _historyPlaceNames.value = emptyMap()
         _historyDaysLoading.value = true
         viewModelScope.launch {
             _historyActiveDays.value = repo.activeDays(memberId, year, month)
@@ -215,7 +217,17 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             val date = LocalDate.of(year, month, day)
             val from = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
             val to   = from + 86_400_000L - 1L
-            _historyPath.value = repo.historyPath(memberId, from, to)
+            val path = repo.historyPath(memberId, from, to)
+            _historyPath.value = path
+            _historyPlaceNames.value = emptyMap()
+            val events = processHistoryPath(path)
+            _historyEvents.value = events
+            events.forEachIndexed { idx, event ->
+                if (event is PathEvent.Stay) launch {
+                    val name = geocoding.reverseGeocode(event.lat, event.lng) ?: return@launch
+                    _historyPlaceNames.update { it + (idx to name) }
+                }
+            }
         }
     }
 

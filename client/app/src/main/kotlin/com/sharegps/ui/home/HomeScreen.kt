@@ -105,6 +105,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
     val historyActiveDays     by vm.historyActiveDays.collectAsState()
     val historyDaysLoading    by vm.historyDaysLoading.collectAsState()
     val historyPath           by vm.historyPath.collectAsState()
+    val historyPlaceNames     by vm.historyPlaceNames.collectAsState()
     val lowBatteryConfirmTarget by vm.lowBatteryConfirmTarget.collectAsState()
 
     lowBatteryConfirmTarget?.let { targetId ->
@@ -227,13 +228,14 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
             listPanel(Modifier.fillMaxHeight().weight(0.38f))
             VerticalDivider(thickness = 2.dp)
             FamilyMapView(
-                members     = members,
-                positions   = positions,
-                selectedId  = selectedId,
-                avatars     = avatars,
-                historyPath = historyPath,
-                myId        = vm.myId,
-                modifier    = Modifier.weight(0.62f),
+                members           = members,
+                positions         = positions,
+                selectedId        = selectedId,
+                avatars           = avatars,
+                historyPath       = historyPath,
+                historyPlaceNames = historyPlaceNames,
+                myId              = vm.myId,
+                modifier          = Modifier.weight(0.62f),
             )
         }
     } else {
@@ -245,13 +247,14 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
             listPanel(Modifier.fillMaxWidth())
             HorizontalDivider(thickness = 2.dp)
             FamilyMapView(
-                members     = members,
-                positions   = positions,
-                selectedId  = selectedId,
-                avatars     = avatars,
-                historyPath = historyPath,
-                myId        = vm.myId,
-                modifier    = Modifier.weight(1f),
+                members           = members,
+                positions         = positions,
+                selectedId        = selectedId,
+                avatars           = avatars,
+                historyPath       = historyPath,
+                historyPlaceNames = historyPlaceNames,
+                myId              = vm.myId,
+                modifier          = Modifier.weight(1f),
             )
         }
     }
@@ -338,13 +341,14 @@ private fun MemberRow(
 
 @Composable
 private fun FamilyMapView(
-    members:     List<FamilyMember>,
-    positions:   Map<String, LocationUpdateMsg>,
-    selectedId:  String?,
-    avatars:     Map<String, Bitmap>,
-    historyPath: List<HistoryPoint> = emptyList(),
-    myId:        String? = null,
-    modifier:    Modifier = Modifier,
+    members:           List<FamilyMember>,
+    positions:         Map<String, LocationUpdateMsg>,
+    selectedId:        String?,
+    avatars:           Map<String, Bitmap>,
+    historyPath:       List<HistoryPoint> = emptyList(),
+    historyPlaceNames: Map<Int, String> = emptyMap(),
+    myId:              String? = null,
+    modifier:          Modifier = Modifier,
 ) {
     val context   = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -403,7 +407,7 @@ private fun FamilyMapView(
         }
     }
 
-    LaunchedEffect(pathEvents, naverMap) {
+    LaunchedEffect(pathEvents, historyPlaceNames, naverMap) {
         val map = naverMap ?: return@LaunchedEffect
         timeMarkers.values.forEach { it.map = null }
         timeMarkers.clear()
@@ -421,13 +425,21 @@ private fun FamilyMapView(
                     m.height      = stayDot.height
                     val from = formatTime(event.fromMs)
                     val to   = formatTime(event.toMs)
-                    m.captionText = if (from == to) from else "$from~$to"
+                    val timeRange = if (from == to) from else "$from~$to"
                     val durationMin = ((event.toMs - event.fromMs) / 60_000).toInt()
-                    m.subCaptionText = if (durationMin >= 60)
+                    val duration = if (durationMin >= 60)
                         "${durationMin / 60}시간 ${durationMin % 60}분"
                     else "${durationMin}분"
+                    val placeName = historyPlaceNames[idx]
+                    if (placeName != null) {
+                        m.captionText    = placeName
+                        m.subCaptionText = "$timeRange · $duration"
+                    } else {
+                        m.captionText    = timeRange
+                        m.subCaptionText = duration
+                    }
                     m.subCaptionTextSize = 10f
-                    m.subCaptionColor = 0xFF616161.toInt()
+                    m.subCaptionColor    = 0xFF616161.toInt()
                 }
                 is PathEvent.Transit -> continue
             }

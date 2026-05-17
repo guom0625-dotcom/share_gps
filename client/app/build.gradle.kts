@@ -40,6 +40,10 @@ android {
             "String", "LOCAL_SERVER_URL",
             "\"${localOrEnv("LOCAL_SERVER_URL")}\""
         )
+        buildConfigField(
+            "String", "NAVER_GEOCODING_SECRET",
+            "\"${localOrEnv("NAVER_GEOCODING_SECRET")}\""
+        )
     }
 
     signingConfigs {
