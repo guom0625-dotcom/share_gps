@@ -135,7 +135,7 @@
 
 - **트리거**: 시청자 클라가 WS로 `watch_start { targetUserId }`
 - **신호 전달**: 서버가 대상자에게 `watching { viewerUserId }` push
-- **대상자 클라**: 즉시 샘플링 3~5초로 가속, WS로 위치 push
+- **대상자 클라**: 즉시 샘플링 10초로 가속, WS로 위치 push
 - **종료**: 시청자 뒤로가기 → `watch_stop` → 평시 모드 복귀
 - **안전장치**: 5~10분 무활동이면 서버가 자동 stop (배터리 보호)
 - **다중 시청자**: 한 명이라도 보고 있으면 능동 모드 유지
@@ -179,7 +179,7 @@ RECEIVE_BOOT_COMPLETED
    👤 엄마   📍 집 · 2분 전
    👤 동생   📍 학교 · 방금
         ↓ (한 명 탭)
-[네이버 지도 풀스크린, 3~5초마다 갱신]
+[네이버 지도 풀스크린, 10초마다 갱신]
 "○○를 실시간으로 보는 중"
         ↓ (뒤로가기)
 [가족 리스트 복귀] → 대상자는 평시 모드로
@@ -209,7 +209,8 @@ share_gps/
 │   │   │   ├── createUser.ts     # CLI: 사용자 등록 + 키 발급
 │   │   │   ├── listUsers.ts
 │   │   │   ├── revokeUser.ts
-│   │   │   └── resetKey.ts
+│   │   │   ├── resetKey.ts
+│   │   │   └── updateUser.ts     # CLI: 이름/역할 수정
 │   │   └── jobs/
 │   │       └── pruneOldLocations.ts   # 매일 03:00 cron
 │   ├── migrations/
@@ -406,12 +407,13 @@ GET /version
 ### Admin CLI (서버에서 직접)
 
 ```bash
-npm run admin -- create-user --name=아빠 --role=parent
+npm run admin -- create-user  --name=아빠 --role=parent
 # → "사용자 생성. 키: K-7f3a-b9e2-... (재출력 불가)"
 
 npm run admin -- list-users
-npm run admin -- reset-key  --user-id=<id>
-npm run admin -- revoke-user --user-id=<id>   # 위치 이력도 같이 삭제
+npm run admin -- reset-key   --user-id=<id>
+npm run admin -- revoke-user --user-id=<id>             # 위치 이력도 같이 삭제
+npm run admin -- update-user --user-id=<id> [--name=<이름>] [--role=parent|child]
 ```
 
 ---

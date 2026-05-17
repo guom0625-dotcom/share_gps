@@ -39,7 +39,11 @@ cp .env.example .env
 npm install
 
 # 사용자 및 키 발급
-node --experimental-strip-types src/admin/cli.ts create-user --name=아빠 --role=parent
+npm run admin -- create-user  --name=아빠  --role=parent
+npm run admin -- list-users
+npm run admin -- update-user  --user-id=<id> [--name=<이름>] [--role=parent|child]
+npm run admin -- reset-key    --user-id=<id>
+npm run admin -- revoke-user  --user-id=<id>
 
 # PM2로 실행
 pm2 start ecosystem.config.cjs
