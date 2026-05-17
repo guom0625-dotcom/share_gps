@@ -3,6 +3,7 @@ package com.sharegps
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -11,7 +12,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -25,17 +25,14 @@ import com.sharegps.location.LocationUploadWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import com.sharegps.ui.enroll.EnrollScreen
 import com.sharegps.ui.home.HomeScreen
 import com.sharegps.ui.permission.PermissionGate
 import com.sharegps.update.AppUpdater
-import com.sharegps.update.UpdateChecker
 
 class MainActivity : ComponentActivity() {
 
-    private val updateTag = mutableStateOf<String?>(null)
-    private var lastUpdateCheckMs = 0L
+    private val vm: MainViewModel by viewModels()
 
     override fun onResume() {
         super.onResume()
@@ -44,19 +41,7 @@ class MainActivity : ComponentActivity() {
             LocationUploadWorker.schedule(this)
             registerFcmToken()
         }
-        checkForUpdate()
-    }
-
-    private fun checkForUpdate() {
-        val now = System.currentTimeMillis()
-        if (now - lastUpdateCheckMs < 30 * 60_000L) return
-        lastUpdateCheckMs = now
-        CoroutineScope(Dispatchers.IO).launch {
-            val latest = UpdateChecker.latestTag() ?: return@launch
-            if (UpdateChecker.isNewer(latest, BuildConfig.VERSION_NAME)) {
-                withContext(Dispatchers.Main) { updateTag.value = latest }
-            }
-        }
+        vm.checkForUpdate()
     }
 
     private fun registerFcmToken() {
@@ -76,20 +61,20 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface {
-                    val tag by updateTag
+                    val tag by vm.updateTag
                     tag?.let { t ->
                         AlertDialog(
-                            onDismissRequest = { updateTag.value = null },
+                            onDismissRequest = { vm.updateTag.value = null },
                             title = { Text("업데이트 있음") },
                             text  = { Text("새 버전 $t 이 출시되었습니다.") },
                             confirmButton = {
                                 TextButton(onClick = {
                                     AppUpdater(applicationContext).download(t)
-                                    updateTag.value = null
+                                    vm.updateTag.value = null
                                 }) { Text("지금 업데이트") }
                             },
                             dismissButton = {
-                                TextButton(onClick = { updateTag.value = null }) { Text("나중에") }
+                                TextButton(onClick = { vm.updateTag.value = null }) { Text("나중에") }
                             },
                         )
                     }
