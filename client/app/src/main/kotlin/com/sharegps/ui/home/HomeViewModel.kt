@@ -18,6 +18,7 @@ import com.sharegps.data.OwnLocationBroadcast
 import com.sharegps.data.WebSocketClient
 import com.sharegps.data.resolveServerUrl
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -69,9 +70,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     var myId: String? = null
         private set
     private var watchJob: Job? = null
+    private var watchStopJob: Job? = null
 
     private val appLifecycleObserver = object : DefaultLifecycleObserver {
         override fun onStart(owner: LifecycleOwner) {
+            watchStopJob?.cancel()
             if (_members.value.isNotEmpty()) refresh()
             startLocationUpdatesJob()
             _selectedId.value?.takeIf { it != myId }?.let {
@@ -79,8 +82,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         override fun onStop(owner: LifecycleOwner) {
-            _selectedId.value?.takeIf { it != myId }?.let {
-                WebSocketClient.get(getApplication())?.watchStop(it)
+            val target = _selectedId.value?.takeIf { it != myId } ?: return
+            watchStopJob = viewModelScope.launch {
+                delay(10_000L)
+                WebSocketClient.get(getApplication())?.watchStop(target)
             }
         }
     }
@@ -243,6 +248,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     override fun onCleared() {
         super.onCleared()
+        watchStopJob?.cancel()
         ProcessLifecycleOwner.get().lifecycle.removeObserver(appLifecycleObserver)
         _selectedId.value?.takeIf { it != myId }?.let {
             WebSocketClient.get(getApplication())?.watchStop(it)
