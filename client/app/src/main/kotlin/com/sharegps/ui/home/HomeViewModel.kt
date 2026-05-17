@@ -65,6 +65,14 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         override fun onStart(owner: LifecycleOwner) {
             if (_members.value.isNotEmpty()) refresh()
             startLocationUpdatesJob()
+            _selectedId.value?.takeIf { it != myId }?.let {
+                WebSocketClient.get(getApplication())?.watchStart(it)
+            }
+        }
+        override fun onStop(owner: LifecycleOwner) {
+            _selectedId.value?.takeIf { it != myId }?.let {
+                WebSocketClient.get(getApplication())?.watchStop(it)
+            }
         }
     }
 
