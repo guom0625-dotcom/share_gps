@@ -60,18 +60,29 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     var myId: String? = null
         private set
     private var watchJob: Job? = null
+    private var bgWatchStopJob: Job? = null
+    private var watchStopSent = false
 
     private val appLifecycleObserver = object : DefaultLifecycleObserver {
         override fun onStart(owner: LifecycleOwner) {
+            bgWatchStopJob?.cancel()
+            bgWatchStopJob = null
+            if (watchStopSent) {
+                watchStopSent = false
+                _selectedId.value?.takeIf { it != myId }?.let {
+                    WebSocketClient.get(getApplication())?.watchStart(it)
+                }
+            }
             if (_members.value.isNotEmpty()) refresh()
             startLocationUpdatesJob()
-            _selectedId.value?.takeIf { it != myId }?.let {
-                WebSocketClient.get(getApplication())?.watchStart(it)
-            }
         }
         override fun onStop(owner: LifecycleOwner) {
-            _selectedId.value?.takeIf { it != myId }?.let {
-                WebSocketClient.get(getApplication())?.watchStop(it)
+            bgWatchStopJob = viewModelScope.launch {
+                delay(120_000L)  // 2분 이상 백그라운드일 때만 watch_stop
+                watchStopSent = true
+                _selectedId.value?.takeIf { it != myId }?.let {
+                    WebSocketClient.get(getApplication())?.watchStop(it)
+                }
             }
         }
     }
