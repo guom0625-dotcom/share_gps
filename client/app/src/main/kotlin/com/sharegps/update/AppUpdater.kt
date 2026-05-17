@@ -29,7 +29,7 @@ class AppUpdater(private val context: Context) {
             .setTitle("Share GPS 업데이트")
             .setDescription("$tagName 다운로드 중…")
             .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, "share-gps.apk")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
 
         val dm = context.getSystemService(DownloadManager::class.java)
         val downloadId = dm.enqueue(request)
@@ -39,13 +39,22 @@ class AppUpdater(private val context: Context) {
                 val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
                 if (id != downloadId) return
                 ctx.unregisterReceiver(this)
-                installApk(dest)
+
+                // 다운로드 성공 여부 확인
+                val query = DownloadManager.Query().setFilterById(downloadId)
+                val cursor = dm.query(query)
+                val success = cursor.use { c ->
+                    c.moveToFirst() &&
+                    c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)) == DownloadManager.STATUS_SUCCESSFUL
+                }
+                if (success) installApk(dest)
             }
         }
+        // ACTION_DOWNLOAD_COMPLETE는 시스템(DownloadManager)이 보내는 broadcast이므로 EXPORTED 필요
         ContextCompat.registerReceiver(
             context, receiver,
             IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
-            ContextCompat.RECEIVER_NOT_EXPORTED,
+            ContextCompat.RECEIVER_EXPORTED,
         )
     }
 
@@ -58,7 +67,6 @@ class AppUpdater(private val context: Context) {
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-        // 포그라운드이면 바로 설치 화면 시작, 아니면 알림으로 유도
         try {
             context.startActivity(install)
         } catch (_: Exception) {
