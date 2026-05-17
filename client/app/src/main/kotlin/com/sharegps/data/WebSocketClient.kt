@@ -41,7 +41,7 @@ class WebSocketClient private constructor(serverUrl: String, private val apiKey:
     private val wsUrl = serverUrl.replace("https://", "wss://").replace("http://", "ws://") + "/ws"
 
     private val okClient = OkHttpClient.Builder()
-        .pingInterval(240, TimeUnit.SECONDS)
+        .pingInterval(25, TimeUnit.SECONDS)
         .build()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
