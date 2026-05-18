@@ -104,6 +104,7 @@ class LocationService : Service() {
                     Log.d("LocSvc", "isBeingWatched=$watched prev=$activeMode isFg=$isForeground")
                     if (watched != activeMode) {
                         activeMode = watched
+                        if (watched) requestFreshFix()
                         restartLocationUpdates()
                         updateNotification()
                     }
@@ -214,7 +215,7 @@ class LocationService : Service() {
 
         val req = LocationRequest.Builder(
             if (highAccuracy) Priority.PRIORITY_HIGH_ACCURACY else Priority.PRIORITY_BALANCED_POWER_ACCURACY,
-            if (highAccuracy) 10_000L else 600_000L,
+            if (highAccuracy) 3_000L else 600_000L,
         ).apply {
             if (!highAccuracy) setMinUpdateDistanceMeters(30f)
         }.build()
