@@ -6,7 +6,7 @@ import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import com.sharegps.BuildConfig
 
-private const val LOCAL_SERVER_URL = "http://192.168.1.101:3000"
+private const val LOCAL_SERVER_URL = "http://192.168.1.101:8080"
 
 fun resolveServerUrl(context: Context): String {
     val homeSsid = Prefs(context).homeWifiSsid ?: return BuildConfig.SERVER_URL
