@@ -28,7 +28,6 @@ import java.util.concurrent.TimeUnit
 
 class WebSocketClient private constructor(
     context: Context,
-    serverUrl: String,
     private val apiKey: String,
 ) {
 
@@ -39,13 +38,15 @@ class WebSocketClient private constructor(
             instance?.let { return it }
             val key = KeyStore(context).getKey() ?: return null
             return synchronized(this) {
-                instance ?: WebSocketClient(context.applicationContext, resolveServerUrl(context), key).also { instance = it }
+                instance ?: WebSocketClient(context.applicationContext, key).also { instance = it }
             }
         }
     }
 
     private val appContext = context.applicationContext
-    private val wsUrl = serverUrl.replace("https://", "wss://").replace("http://", "ws://") + "/ws"
+
+    private fun currentWsUrl() =
+        resolveServerUrl(appContext).replace("https://", "wss://").replace("http://", "ws://") + "/ws"
 
     private val okClient = OkHttpClient.Builder()
         .pingInterval(25, TimeUnit.SECONDS)
@@ -83,14 +84,14 @@ class WebSocketClient private constructor(
     fun connect() {
         intentionalDisconnect = false
         if (ws != null) return
-        ws = okClient.newWebSocket(Request.Builder().url(wsUrl).build(), listener)
+        ws = okClient.newWebSocket(Request.Builder().url(currentWsUrl()).build(), listener)
     }
 
     @Synchronized
     fun forceReconnect() {
         intentionalDisconnect = false
         val old = ws
-        ws = okClient.newWebSocket(Request.Builder().url(wsUrl).build(), listener)
+        ws = okClient.newWebSocket(Request.Builder().url(currentWsUrl()).build(), listener)
         try { old?.close(4002, "force reconnect") } catch (_: Exception) {}
     }
 
