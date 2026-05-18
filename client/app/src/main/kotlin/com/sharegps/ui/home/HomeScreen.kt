@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Battery6Bar
 import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -89,6 +90,8 @@ import com.naver.maps.map.overlay.PolylineOverlay
 import com.sharegps.data.FamilyMember
 import com.sharegps.data.HistoryPoint
 import com.sharegps.data.LocationUpdateMsg
+import com.sharegps.data.Prefs
+import com.sharegps.data.getConnectedSsid
 import java.time.YearMonth
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -137,6 +140,11 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
         }
     }
 
+    var showSettings by remember { mutableStateOf(false) }
+    if (showSettings) {
+        WifiSettingsDialog(onDismiss = { showSettings = false })
+    }
+
     // 멤버 리스트 패널 (portrait: 상단, landscape: 좌측)
     val listPanel: @Composable (Modifier) -> Unit = { modifier ->
         Column(modifier = modifier) {
@@ -152,6 +160,9 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.weight(1f),
                     )
+                    IconButton(onClick = { showSettings = true }) {
+                        Icon(Icons.Default.Settings, contentDescription = "설정")
+                    }
                 } else {
                     val memberName = members.find { it.id == historyMemberId }?.name ?: ""
                     Text(
@@ -639,4 +650,44 @@ private fun speedLabel(speedMs: Double?): String {
     if (speedMs == null || speedMs < 1.0) return ""
     return if (speedMs >= 8.0) "🚗 ${(speedMs * 3.6).roundToInt()}km/h"
     else "🚶 이동 중"
+}
+
+@Composable
+private fun WifiSettingsDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val prefs = remember { Prefs(context) }
+    var savedSsid by remember { mutableStateOf(prefs.homeWifiSsid) }
+    val currentSsid = remember { getConnectedSsid(context) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("집 WiFi 설정") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("저장된 집 WiFi",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(savedSsid ?: "미설정", fontWeight = FontWeight.SemiBold)
+                androidx.compose.foundation.layout.Spacer(Modifier.size(8.dp))
+                Text("현재 연결된 WiFi",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(currentSsid ?: "WiFi 미연결", fontWeight = FontWeight.SemiBold)
+                if (currentSsid != null && currentSsid != savedSsid) {
+                    androidx.compose.foundation.layout.Spacer(Modifier.size(4.dp))
+                    TextButton(
+                        onClick = { prefs.homeWifiSsid = currentSsid; savedSsid = currentSsid },
+                        modifier = Modifier.align(Alignment.Start),
+                    ) { Text("현재 WiFi를 집으로 설정") }
+                }
+                if (savedSsid != null) {
+                    TextButton(
+                        onClick = { prefs.homeWifiSsid = null; savedSsid = null },
+                        modifier = Modifier.align(Alignment.Start),
+                    ) { Text("초기화", color = MaterialTheme.colorScheme.error) }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("닫기") } },
+    )
 }
