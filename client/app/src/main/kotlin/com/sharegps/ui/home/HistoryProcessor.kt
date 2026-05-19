@@ -53,59 +53,72 @@ fun processHistoryPath(points: List<HistoryPoint>): List<PathEvent> {
 
     val stayRadiusM = 150.0
     val stayMinMs   = 10 * 60_000L
-    val events      = mutableListOf<PathEvent>()
-    var transitBuf  = mutableListOf<HistoryPoint>()
 
-    fun flushTransit() {
-        if (transitBuf.isEmpty()) return
-        val from = transitBuf.first()
-        val to   = transitBuf.last()
-        var distM = 0.0
-        for (k in 1 until transitBuf.size) {
-            distM += haversineM(
-                transitBuf[k - 1].lat, transitBuf[k - 1].lng,
-                transitBuf[k].lat,     transitBuf[k].lng,
-            )
-        }
-        val durationSec = (to.recordedAt - from.recordedAt) / 1000.0
-        val avgSpeedMs  = if (durationSec > 0) distM / durationSec else 0.0
-        val mode = when {
-            avgSpeedMs >= 8.0 -> MoveMode.DRIVE
-            avgSpeedMs >= 0.5 -> MoveMode.WALK
-            else              -> MoveMode.UNKNOWN
-        }
-        events.add(PathEvent.Move(from.recordedAt, to.recordedAt, distM, mode))
-        transitBuf = mutableListOf()
-    }
-
+    // Pass 1: detect stay index ranges
+    val stayRanges = mutableListOf<IntRange>()
     var i = 0
     while (i < cleaned.size) {
-        val anchor = cleaned[i]
         var j = i + 1
         while (j < cleaned.size &&
-               haversineM(anchor.lat, anchor.lng, cleaned[j].lat, cleaned[j].lng) <= stayRadiusM) {
+               haversineM(cleaned[i].lat, cleaned[i].lng, cleaned[j].lat, cleaned[j].lng) <= stayRadiusM) {
             j++
         }
         val endIdx   = j - 1
-        val duration = cleaned[endIdx].recordedAt - anchor.recordedAt
+        val duration = cleaned[endIdx].recordedAt - cleaned[i].recordedAt
         if (duration >= stayMinMs && j > i + 1) {
-            flushTransit()
-            val sub = cleaned.subList(i, j)
-            events.add(PathEvent.Stay(
-                lat    = sub.map { it.lat }.average(),
-                lng    = sub.map { it.lng }.average(),
-                fromMs = anchor.recordedAt,
-                toMs   = cleaned[endIdx].recordedAt,
-            ))
+            stayRanges.add(i until j)
             i = j
         } else {
-            transitBuf.add(anchor)
             i++
         }
     }
-    flushTransit()
+
+    // Pass 2: emit Stays and Moves that include the boundary points of adjacent stays
+    val events = mutableListOf<PathEvent>()
+    var cursor = 0
+    for (range in stayRanges) {
+        if (cursor < range.first) {
+            val moveStart = if (cursor > 0) cursor - 1 else cursor
+            buildMove(cleaned, moveStart, range.first)?.let { events.add(it) }
+        }
+        val sub = cleaned.subList(range.first, range.last + 1)
+        events.add(PathEvent.Stay(
+            lat    = sub.map { it.lat }.average(),
+            lng    = sub.map { it.lng }.average(),
+            fromMs = cleaned[range.first].recordedAt,
+            toMs   = cleaned[range.last].recordedAt,
+        ))
+        cursor = range.last + 1
+    }
+    if (cursor < cleaned.size) {
+        val moveStart = if (cursor > 0) cursor - 1 else cursor
+        buildMove(cleaned, moveStart, cleaned.size - 1)?.let { events.add(it) }
+    }
 
     return events
+}
+
+private fun buildMove(cleaned: List<HistoryPoint>, fromIdx: Int, toIdx: Int): PathEvent.Move? {
+    if (fromIdx >= toIdx) return null
+    val from = cleaned[fromIdx]
+    val to   = cleaned[toIdx]
+    var distM = 0.0
+    for (k in fromIdx + 1..toIdx) {
+        distM += haversineM(
+            cleaned[k - 1].lat, cleaned[k - 1].lng,
+            cleaned[k].lat,     cleaned[k].lng,
+        )
+    }
+    val durationMs = to.recordedAt - from.recordedAt
+    if (distM == 0.0 && durationMs == 0L) return null
+    val durationSec = durationMs / 1000.0
+    val avgSpeedMs  = if (durationSec > 0) distM / durationSec else 0.0
+    val mode = when {
+        avgSpeedMs >= 8.0 -> MoveMode.DRIVE
+        avgSpeedMs >= 0.5 -> MoveMode.WALK
+        else              -> MoveMode.UNKNOWN
+    }
+    return PathEvent.Move(from.recordedAt, to.recordedAt, distM, mode)
 }
 
 fun formatTime(ms: Long): String {

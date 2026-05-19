@@ -542,8 +542,9 @@ private fun FamilyMapView(
         }
     }
 
-    LaunchedEffect(positions.isNotEmpty(), naverMap) {
+    LaunchedEffect(positions.isNotEmpty(), naverMap, inHistoryMode) {
         val map = naverMap ?: return@LaunchedEffect
+        if (inHistoryMode) return@LaunchedEffect
         if (positions.isEmpty()) return@LaunchedEffect
         if (selectedId != null) return@LaunchedEffect
         val latlngs = positions.values.map { LatLng(it.lat, it.lng) }

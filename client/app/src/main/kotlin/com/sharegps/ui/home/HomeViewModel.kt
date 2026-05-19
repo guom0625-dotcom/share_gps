@@ -70,6 +70,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     var myId: String? = null
         private set
     private var watchJob: Job? = null
+    private var historyDateJob: Job? = null
 
     private val appLifecycleObserver = object : DefaultLifecycleObserver {
         override fun onStart(owner: LifecycleOwner) {
@@ -195,6 +196,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun enterHistory(memberId: String) {
+        // 히스토리 진입 시 활성 추적을 멈춰 상대 폰의 GPS 부하/배터리 소모를 끊는다
+        applySelection(_selectedId.value, null)
         _historyMemberId.value = memberId
         _historyPath.value = emptyList()
         val now = YearMonth.now()
@@ -227,7 +230,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun loadHistoryDate(memberId: String, year: Int, month: Int, day: Int) {
-        viewModelScope.launch {
+        historyDateJob?.cancel()
+        historyDateJob = viewModelScope.launch {
             val date = LocalDate.of(year, month, day)
             val from = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
             val to   = from + 86_400_000L - 1L
