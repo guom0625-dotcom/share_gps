@@ -3,6 +3,7 @@ package com.sharegps.ui.home
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.os.Bundle
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -128,6 +129,10 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
             confirmButton = { TextButton(onClick = { vm.confirmWatch(targetId) }) { Text("계속") } },
             dismissButton = { TextButton(onClick = vm::dismissLowBatteryConfirm) { Text("취소") } },
         )
+    }
+
+    BackHandler(enabled = historyMemberId != null) {
+        if (historyPath.isNotEmpty()) vm.clearHistoryDate() else vm.exitHistory()
     }
 
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -488,8 +493,16 @@ private fun FamilyMapView(
         }
     }
 
-    LaunchedEffect(positions, naverMap, avatars) {
+    val inHistoryMode = historyPath.isNotEmpty()
+    LaunchedEffect(positions, naverMap, avatars, inHistoryMode) {
         val map = naverMap ?: return@LaunchedEffect
+        if (inHistoryMode) {
+            markers.values.forEach { it.map = null }
+            markers.clear()
+            circles.values.forEach { it.map = null }
+            circles.clear()
+            return@LaunchedEffect
+        }
         for ((userId, pos) in positions) {
             val member = members.find { it.id == userId } ?: continue
             val latlng = LatLng(pos.lat, pos.lng)
