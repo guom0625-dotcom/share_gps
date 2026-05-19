@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Battery0Bar
@@ -38,6 +39,9 @@ import androidx.compose.material.icons.filled.Battery6Bar
 import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -110,6 +114,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
     val historyActiveDays     by vm.historyActiveDays.collectAsState()
     val historyDaysLoading    by vm.historyDaysLoading.collectAsState()
     val historyPath           by vm.historyPath.collectAsState()
+    val historyEvents         by vm.historyEvents.collectAsState()
     val historyPlaceNames     by vm.historyPlaceNames.collectAsState()
     val lowBatteryConfirmTarget by vm.lowBatteryConfirmTarget.collectAsState()
 
@@ -176,6 +181,11 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
                         Icon(Icons.Default.Settings, contentDescription = "설정")
                     }
                 } else {
+                    if (historyPath.isNotEmpty()) {
+                        IconButton(onClick = vm::clearHistoryDate) {
+                            Icon(Icons.Default.ChevronLeft, contentDescription = null)
+                        }
+                    }
                     val memberName = members.find { it.id == historyMemberId }?.name ?: ""
                     Text(
                         text = "$memberName 이동 이력",
@@ -191,13 +201,19 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
                     .fillMaxWidth()
                     .then(
                         when {
-                            isLandscape                -> Modifier.weight(1f)
-                            historyMemberId == null    -> Modifier.heightIn(min = 72.dp, max = 216.dp)
-                            else                       -> Modifier
+                            isLandscape                               -> Modifier.weight(1f)
+                            historyMemberId == null                   -> Modifier.heightIn(min = 72.dp, max = 216.dp)
+                            historyPath.isNotEmpty()                  -> Modifier.heightIn(max = 300.dp)
+                            else                                      -> Modifier
                         }
                     ),
             ) {
                 when {
+                    historyMemberId != null && historyPath.isNotEmpty() -> TimelineList(
+                        events     = historyEvents,
+                        placeNames = historyPlaceNames,
+                        modifier   = Modifier.fillMaxSize(),
+                    )
                     historyMemberId != null -> HistoryCalendar(
                         activeDays    = historyActiveDays,
                         daysLoading   = historyDaysLoading,
@@ -256,6 +272,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
                 selectedId        = selectedId,
                 avatars           = avatars,
                 historyPath       = historyPath,
+                historyEvents     = historyEvents,
                 historyPlaceNames = historyPlaceNames,
                 myId              = vm.myId,
                 modifier          = Modifier.weight(0.62f),
@@ -275,6 +292,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
                 selectedId        = selectedId,
                 avatars           = avatars,
                 historyPath       = historyPath,
+                historyEvents     = historyEvents,
                 historyPlaceNames = historyPlaceNames,
                 myId              = vm.myId,
                 modifier          = Modifier.weight(1f),
@@ -369,6 +387,7 @@ private fun FamilyMapView(
     selectedId:        String?,
     avatars:           Map<String, Bitmap>,
     historyPath:       List<HistoryPoint> = emptyList(),
+    historyEvents:     List<PathEvent> = emptyList(),
     historyPlaceNames: Map<Int, String> = emptyMap(),
     myId:              String? = null,
     modifier:          Modifier = Modifier,
@@ -383,10 +402,8 @@ private fun FamilyMapView(
     val circles     = remember { mutableMapOf<String, CircleOverlay>() }
     val polyline    = remember { PolylineOverlay() }
     val timeMarkers = remember { mutableMapOf<Int, Marker>() }
-    val transitDot  = remember { createTransitDot() }
-    val stayDot     = remember { createStayDot() }
-    val pathCoords  = remember(historyPath) { filterHistoryPath(historyPath).map { LatLng(it.lat, it.lng) } }
-    val pathEvents  = remember(historyPath) { processHistoryPath(historyPath) }
+    val stayDot    = remember { createStayDot() }
+    val pathCoords = remember(historyPath) { filterHistoryPath(historyPath).map { LatLng(it.lat, it.lng) } }
 
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
@@ -430,11 +447,11 @@ private fun FamilyMapView(
         }
     }
 
-    LaunchedEffect(pathEvents, historyPlaceNames, naverMap) {
+    LaunchedEffect(historyEvents, historyPlaceNames, naverMap) {
         val map = naverMap ?: return@LaunchedEffect
         timeMarkers.values.forEach { it.map = null }
         timeMarkers.clear()
-        for ((idx, event) in pathEvents.withIndex()) {
+        for ((idx, event) in historyEvents.withIndex()) {
             val m = Marker()
             m.captionTextSize  = 11f
             m.captionColor     = 0xFF212121.toInt()
@@ -464,7 +481,7 @@ private fun FamilyMapView(
                     m.subCaptionTextSize = 10f
                     m.subCaptionColor    = 0xFF616161.toInt()
                 }
-                is PathEvent.Transit -> continue
+                is PathEvent.Move -> continue
             }
             m.map = map
             timeMarkers[idx] = m
@@ -662,6 +679,95 @@ private fun speedLabel(speedMs: Double?): String {
     if (speedMs == null || speedMs < 1.0) return ""
     return if (speedMs >= 8.0) "🚗 ${(speedMs * 3.6).roundToInt()}km/h"
     else "🚶 이동 중"
+}
+
+@Composable
+private fun TimelineList(
+    events:     List<PathEvent>,
+    placeNames: Map<Int, String>,
+    modifier:   Modifier = Modifier,
+) {
+    if (events.isEmpty()) {
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+            Text("이동 기록 없음", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        return
+    }
+    LazyColumn(modifier = modifier) {
+        itemsIndexed(events) { idx, event ->
+            when (event) {
+                is PathEvent.Stay -> StayEventRow(event, placeNames[idx])
+                is PathEvent.Move -> MoveEventRow(event)
+            }
+            if (idx < events.lastIndex) {
+                HorizontalDivider(
+                    modifier  = Modifier.padding(start = 36.dp),
+                    thickness = 0.5.dp,
+                    color     = MaterialTheme.colorScheme.outlineVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StayEventRow(event: PathEvent.Stay, placeName: String?) {
+    Row(
+        modifier              = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment     = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(12.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFFB8C00)),
+        )
+        Column {
+            val from      = formatTime(event.fromMs)
+            val to        = formatTime(event.toMs)
+            val timeRange = "$from ~ $to"
+            Text(
+                text       = placeName ?: timeRange,
+                style      = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text  = (if (placeName != null) "$timeRange · " else "") + formatDuration(event.fromMs, event.toMs),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MoveEventRow(event: PathEvent.Move) {
+    val modeIcon = when (event.mode) {
+        MoveMode.DRIVE   -> Icons.Default.DirectionsCar
+        MoveMode.WALK    -> Icons.Default.DirectionsWalk
+        MoveMode.UNKNOWN -> Icons.Default.Navigation
+    }
+    val modeTint = when (event.mode) {
+        MoveMode.DRIVE   -> MaterialTheme.colorScheme.primary
+        MoveMode.WALK    -> Color(0xFF43A047)
+        MoveMode.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val distText = if (event.distanceM >= 1000)
+        "${"%.1f".format(event.distanceM / 1000)} km"
+    else "${event.distanceM.roundToInt()} m"
+    Row(
+        modifier              = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment     = Alignment.CenterVertically,
+    ) {
+        Icon(modeIcon, contentDescription = null, modifier = Modifier.size(16.dp), tint = modeTint)
+        Text(
+            text  = "$distText · ${formatDuration(event.fromMs, event.toMs)}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 @Composable

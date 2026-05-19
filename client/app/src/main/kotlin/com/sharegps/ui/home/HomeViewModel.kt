@@ -209,6 +209,12 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _historyPlaceNames.value = emptyMap()
     }
 
+    fun clearHistoryDate() {
+        _historyPath.value = emptyList()
+        _historyEvents.value = emptyList()
+        _historyPlaceNames.value = emptyMap()
+    }
+
     fun loadActiveDays(memberId: String, year: Int, month: Int) {
         _historyPath.value = emptyList()
         _historyEvents.value = emptyList()
