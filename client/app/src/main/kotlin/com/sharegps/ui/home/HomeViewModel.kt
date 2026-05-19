@@ -88,9 +88,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         override fun onStop(owner: LifecycleOwner) {
-            _selectedId.value?.takeIf { it != myId }?.let {
-                WebSocketClient.get(getApplication())?.watchStop(it)
-            }
+            // 백그라운드 진입 시 활성 추적 해제 — 복귀했을 때 자동으로 이어 추적하지 않음
+            applySelection(_selectedId.value, null)
         }
     }
 
