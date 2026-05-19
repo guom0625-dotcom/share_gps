@@ -87,6 +87,8 @@ import com.naver.maps.map.overlay.Marker
 import com.naver.maps.map.overlay.OverlayImage
 import com.naver.maps.map.overlay.Align
 import com.naver.maps.map.overlay.PolylineOverlay
+import androidx.compose.ui.res.painterResource
+import com.sharegps.R
 import com.sharegps.data.FamilyMember
 import com.sharegps.data.HistoryPoint
 import com.sharegps.data.LocationUpdateMsg
@@ -155,11 +157,21 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (historyMemberId == null) {
-                    Text(
-                        text = "가족 위치",
-                        style = MaterialTheme.typography.titleMedium,
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier.weight(1f),
-                    )
+                    ) {
+                        Image(
+                            painter = painterResource(R.mipmap.ic_launcher_fg),
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp),
+                        )
+                        Text(
+                            text = "gomSharing",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
                     IconButton(onClick = { showSettings = true }) {
                         Icon(Icons.Default.Settings, contentDescription = "설정")
                     }
