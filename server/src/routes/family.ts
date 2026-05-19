@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Db } from '../db.ts';
 import type { makeAuth } from '../auth.ts';
 import { hasAvatar } from './avatar.ts';
+import { sendFcmToToken } from '../fcm.ts';
 
 interface FamilyRow {
     id: string;
@@ -60,6 +61,19 @@ export function registerFamilyRoutes(
                 pausedUntil: row.paused_until ?? null,
             },
         };
+    });
+
+    const getFamilyTokens = db.prepare(`
+        SELECT u.id, u.fcm_token
+        FROM users u
+        WHERE u.revoked_at IS NULL AND u.fcm_token IS NOT NULL
+    `);
+
+    app.post('/family/request-locations', { preHandler: [auth] }, async (req) => {
+        const rows = getFamilyTokens.all() as { id: string; fcm_token: string }[];
+        const others = rows.filter((r) => r.id !== req.user.id);
+        await Promise.all(others.map((r) => sendFcmToToken(r.fcm_token, { type: 'location_request' })));
+        return { ok: true, sent: others.length };
     });
 
     app.get('/family', { preHandler: [auth] }, async () => {

@@ -55,11 +55,21 @@ class LocationService : Service() {
     companion object {
         private const val NOTIF_CHANNEL = "location_sharing"
         private const val NOTIF_ID = 1
+        private const val ACTION_SEND_LOCATION = "com.sharegps.SEND_LOCATION"
 
         fun start(context: Context) {
             ContextCompat.startForegroundService(
                 context,
                 Intent(context, LocationService::class.java),
+            )
+        }
+
+        fun requestFreshLocation(context: Context) {
+            ContextCompat.startForegroundService(
+                context,
+                Intent(context, LocationService::class.java).apply {
+                    action = ACTION_SEND_LOCATION
+                },
             )
         }
     }
@@ -232,6 +242,7 @@ class LocationService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         wsClient?.takeIf { !it.isConnected }?.connect()
+        if (intent?.action == ACTION_SEND_LOCATION) requestFreshFix()
         return START_STICKY
     }
 

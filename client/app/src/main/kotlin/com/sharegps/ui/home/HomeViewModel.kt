@@ -18,6 +18,7 @@ import com.sharegps.data.OwnLocationBroadcast
 import com.sharegps.data.WebSocketClient
 import com.sharegps.data.resolveServerUrl
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -72,7 +73,14 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     private val appLifecycleObserver = object : DefaultLifecycleObserver {
         override fun onStart(owner: LifecycleOwner) {
-            if (_members.value.isNotEmpty()) refresh()
+            if (_members.value.isNotEmpty()) {
+                refresh()
+                viewModelScope.launch {
+                    repo.requestLocations()
+                    delay(3_000)
+                    refresh()
+                }
+            }
             startLocationUpdatesJob()
             _selectedId.value?.takeIf { it != myId }?.let {
                 WebSocketClient.get(getApplication())?.watchStart(it)

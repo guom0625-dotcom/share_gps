@@ -76,6 +76,11 @@ class ApiRepository(private val serverUrl: String, private val apiKey: String) {
         }.status.isSuccess()
     } catch (_: Exception) { false }
 
+    suspend fun requestLocations(): Unit = try {
+        http.post("$serverUrl/family/request-locations") { bearerAuth(apiKey) }
+        Unit
+    } catch (_: Exception) { }
+
     suspend fun setShareState(mode: String, pausedUntilMinutes: Int? = null): Boolean = try {
         http.post("$serverUrl/me/share-state") {
             bearerAuth(apiKey)

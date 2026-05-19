@@ -27,8 +27,10 @@ class ShareGpsFirebaseService : FirebaseMessagingService() {
         when (message.data["type"]) {
             "watch_start", "watch_stop" -> {
                 LocationService.start(applicationContext)
-                // 좀비 WS 강제 재연결 — 서버가 watching/no_watchers를 replay하도록
                 WebSocketClient.get(applicationContext)?.forceReconnect()
+            }
+            "location_request" -> {
+                LocationService.requestFreshLocation(applicationContext)
             }
         }
     }
