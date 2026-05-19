@@ -93,6 +93,7 @@ import com.naver.maps.map.overlay.OverlayImage
 import com.naver.maps.map.overlay.Align
 import com.naver.maps.map.overlay.PolylineOverlay
 import androidx.compose.ui.res.painterResource
+import com.sharegps.BuildConfig
 import com.sharegps.R
 import com.sharegps.data.FamilyMember
 import com.sharegps.data.HistoryPoint
@@ -818,6 +819,13 @@ private fun WifiSettingsDialog(onDismiss: () -> Unit) {
                         modifier = Modifier.align(Alignment.Start),
                     ) { Text("초기화", color = MaterialTheme.colorScheme.error) }
                 }
+                androidx.compose.foundation.layout.Spacer(Modifier.size(8.dp))
+                HorizontalDivider()
+                androidx.compose.foundation.layout.Spacer(Modifier.size(8.dp))
+                Text("앱 버전",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("v${BuildConfig.VERSION_NAME}", fontWeight = FontWeight.SemiBold)
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("닫기") } },
