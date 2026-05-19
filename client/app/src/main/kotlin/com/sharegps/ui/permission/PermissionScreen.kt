@@ -1,7 +1,12 @@
 package com.sharegps.ui.permission
 
 import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +39,10 @@ fun PermissionGate(content: @Composable () -> Unit) {
     fun check(perm: String) =
         ContextCompat.checkSelfPermission(ctx, perm) == PERMISSION_GRANTED
 
+    fun isBatteryExempt() =
+        (ctx.getSystemService(Context.POWER_SERVICE) as PowerManager)
+            .isIgnoringBatteryOptimizations(ctx.packageName)
+
     var fineOk by remember { mutableStateOf(check(Manifest.permission.ACCESS_FINE_LOCATION)) }
     var bgOk by remember {
         mutableStateOf(
@@ -42,6 +51,7 @@ fun PermissionGate(content: @Composable () -> Unit) {
             else true
         )
     }
+    var batteryOk by remember { mutableStateOf(isBatteryExempt()) }
 
     val step1Launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -52,6 +62,10 @@ fun PermissionGate(content: @Composable () -> Unit) {
     val step2Launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted -> bgOk = granted }
+
+    val batteryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { batteryOk = isBatteryExempt() }
 
     when {
         !fineOk -> PermissionStep(
@@ -77,6 +91,17 @@ fun PermissionGate(content: @Composable () -> Unit) {
             buttonLabel = "항상 허용 설정",
         ) {
             step2Launcher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        }
+        !batteryOk -> PermissionStep(
+            title = "배터리 최적화 제외 필요",
+            body = "백그라운드에서 위치를 지속적으로 공유하려면\n배터리 최적화 예외 설정이 필요합니다.\n\n다음 화면에서 '허용'을 눌러주세요.",
+            buttonLabel = "배터리 최적화 제외",
+        ) {
+            batteryLauncher.launch(
+                Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                    data = Uri.parse("package:${ctx.packageName}")
+                }
+            )
         }
         else -> content()
     }
