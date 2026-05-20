@@ -51,14 +51,14 @@ class ApiRepository(private val serverUrl: String, private val apiKey: String) {
         }.status.isSuccess()
     } catch (_: Exception) { false }
 
-    suspend fun activeDays(userId: String, year: Int, month: Int): Set<Int> = try {
+    suspend fun activeDays(userId: String, year: Int, month: Int): Set<Int> {
         @Serializable data class Resp(val days: List<Int>)
-        http.get("$serverUrl/locations/$userId/active-days") {
+        return http.get("$serverUrl/locations/$userId/active-days") {
             bearerAuth(apiKey)
             parameter("year", year)
             parameter("month", month)
         }.body<Resp>().days.toSet()
-    } catch (_: Exception) { emptySet() }
+    }
 
     suspend fun historyPath(userId: String, from: Long, to: Long): List<HistoryPoint> = try {
         http.get("$serverUrl/locations/$userId/history") {

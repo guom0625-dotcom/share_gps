@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -113,8 +114,9 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
     val error                 by vm.error.collectAsState()
     val avatars               by vm.avatars.collectAsState()
     val historyMemberId       by vm.historyMemberId.collectAsState()
-    val historyActiveDays     by vm.historyActiveDays.collectAsState()
-    val historyDaysLoading    by vm.historyDaysLoading.collectAsState()
+    val historyActiveDays       by vm.historyActiveDays.collectAsState()
+    val historyDaysLoading      by vm.historyDaysLoading.collectAsState()
+    val historyActiveDaysError  by vm.historyActiveDaysError.collectAsState()
     val historyPath           by vm.historyPath.collectAsState()
     val historyEvents         by vm.historyEvents.collectAsState()
     val historyPlaceNames     by vm.historyPlaceNames.collectAsState()
@@ -223,6 +225,7 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
                     historyMemberId != null -> HistoryCalendar(
                         activeDays    = historyActiveDays,
                         daysLoading   = historyDaysLoading,
+                        hasError      = historyActiveDaysError,
                         onDaySelect   = { y, m, d -> vm.loadHistoryDate(historyMemberId!!, y, m, d) },
                         onMonthChange = { y, m -> vm.loadActiveDays(historyMemberId!!, y, m) },
                         modifier      = Modifier.fillMaxWidth(),
@@ -589,6 +592,7 @@ private fun FamilyMapView(
 private fun HistoryCalendar(
     activeDays:    Set<Int>,
     daysLoading:   Boolean = false,
+    hasError:      Boolean = false,
     onDaySelect:   (year: Int, month: Int, day: Int) -> Unit,
     onMonthChange: (year: Int, month: Int) -> Unit,
     modifier:      Modifier = Modifier,
@@ -615,6 +619,27 @@ private fun HistoryCalendar(
 
         if (daysLoading) {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+
+        if (hasError && !daysLoading) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    "불러오기 실패",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                IconButton(onClick = { onMonthChange(ym.year, ym.monthValue) }) {
+                    Icon(Icons.Default.Refresh, contentDescription = "다시 시도",
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.error)
+                }
+            }
         }
 
         Row(Modifier.fillMaxWidth()) {

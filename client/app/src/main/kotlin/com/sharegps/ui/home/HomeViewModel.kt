@@ -58,6 +58,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val _historyDaysLoading = MutableStateFlow(false)
     val historyDaysLoading: StateFlow<Boolean> = _historyDaysLoading
 
+    private val _historyActiveDaysError = MutableStateFlow(false)
+    val historyActiveDaysError: StateFlow<Boolean> = _historyActiveDaysError
+
     private val _historyPath = MutableStateFlow<List<HistoryPoint>>(emptyList())
     val historyPath: StateFlow<List<HistoryPoint>> = _historyPath
 
@@ -222,8 +225,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         _historyEvents.value = emptyList()
         _historyPlaceNames.value = emptyMap()
         _historyDaysLoading.value = true
+        _historyActiveDaysError.value = false
         viewModelScope.launch {
-            _historyActiveDays.value = repo.activeDays(memberId, year, month)
+            runCatching { repo.activeDays(memberId, year, month) }
+                .onSuccess { _historyActiveDays.value = it }
+                .onFailure { _historyActiveDaysError.value = true }
             _historyDaysLoading.value = false
         }
     }
