@@ -17,15 +17,15 @@ HOST=127.0.0.1   # Caddy가 외부 담당
 
 IP 갱신 스크립트 cron 등록 (5분마다):
 ```bash
-chmod +x /root/projects/share_gps/scripts/duckdns-update.sh
+chmod +x /home/guom0625/workspace/share_gps/scripts/duckdns-update.sh
 crontab -e
 # 다음 줄 추가:
-# */5 * * * * DUCKDNS_TOKEN=<토큰> /root/projects/share_gps/scripts/duckdns-update.sh
+# */5 * * * * DUCKDNS_TOKEN=<토큰> /home/guom0625/workspace/share_gps/scripts/duckdns-update.sh
 ```
 
 첫 갱신 확인:
 ```bash
-DUCKDNS_TOKEN=<토큰> /root/projects/share_gps/scripts/duckdns-update.sh
+DUCKDNS_TOKEN=<토큰> /home/guom0625/workspace/share_gps/scripts/duckdns-update.sh
 cat /tmp/duckdns.log   # "OK" 나오면 성공
 ```
 
@@ -55,10 +55,10 @@ ip addr show wlan0 | grep "inet "
 
 ```bash
 # 처음 실행 (Let's Encrypt 인증서 자동 발급 — 포트포워딩 먼저 완료 후)
-caddy run --config /root/projects/share_gps/server/Caddyfile
+caddy run --config /home/guom0625/workspace/share_gps/server/Caddyfile
 
 # 백그라운드 (pm2로 관리)
-pm2 start "caddy run --config /root/projects/share_gps/server/Caddyfile" --name caddy
+pm2 start "caddy run --config /home/guom0625/workspace/share_gps/server/Caddyfile" --name caddy
 pm2 save
 ```
 
@@ -67,7 +67,7 @@ pm2 save
 ## 4. Node.js 서버 pm2 실행
 
 ```bash
-cd /root/projects/share_gps/server
+cd /home/guom0625/workspace/share_gps/server
 cp .env.example .env      # 토큰 등 실제 값으로 수정
 pm2 start ecosystem.config.cjs
 pm2 save
@@ -86,7 +86,7 @@ curl https://guom0625.duckdns.org/health
 # → {"ok":true,"time":...}
 
 # 사용자 등록
-cd /root/projects/share_gps/server
+cd /home/guom0625/workspace/share_gps/server
 npm run admin -- create-user --name=아빠 --role=parent
 ```
 

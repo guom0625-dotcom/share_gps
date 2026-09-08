@@ -7,6 +7,6 @@ guom0625.duckdns.org {
     reverse_proxy localhost:3000
 }
 
-http://192.168.1.101:8080 {
+http://192.168.1.225:8080 {
     reverse_proxy localhost:3000
 }
