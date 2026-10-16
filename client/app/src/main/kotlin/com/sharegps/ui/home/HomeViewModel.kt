@@ -28,7 +28,7 @@ import java.time.YearMonth
 import java.time.ZoneId
 
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
-    private val repo = ApiRepository(resolveServerUrl(app), KeyStore(app).getKey() ?: "")
+    private val repo = ApiRepository({ resolveServerUrl(app) }, KeyStore(app).getKey() ?: "")
     private val geocoding = GeocodingRepository(BuildConfig.NAVER_MAPS_CLIENT_ID, BuildConfig.NAVER_GEOCODING_SECRET)
 
     private val _members = MutableStateFlow<List<FamilyMember>>(emptyList())

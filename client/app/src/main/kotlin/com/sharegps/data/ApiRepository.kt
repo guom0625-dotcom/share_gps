@@ -19,7 +19,12 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-class ApiRepository(private val serverUrl: String, private val apiKey: String) {
+class ApiRepository(private val serverUrlProvider: () -> String, private val apiKey: String) {
+    constructor(serverUrl: String, apiKey: String) : this({ serverUrl }, apiKey)
+
+    // 요청마다 다시 계산해 홈 WiFi ↔ 외부 망 전환 후에도 맞는 주소로 간다.
+    private val serverUrl: String get() = serverUrlProvider()
+
     private val http = HttpClient(OkHttp) {
         install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
         install(HttpTimeout) { requestTimeoutMillis = 10_000 }
