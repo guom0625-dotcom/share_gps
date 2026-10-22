@@ -4,6 +4,7 @@ import android.app.Application
 import android.graphics.Bitmap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.viewModelScope
@@ -15,6 +16,7 @@ import com.sharegps.data.HistoryPoint
 import com.sharegps.data.KeyStore
 import com.sharegps.data.LocationUpdateMsg
 import com.sharegps.data.OwnLocationBroadcast
+import com.sharegps.data.Prefs
 import com.sharegps.data.WebSocketClient
 import com.sharegps.data.resolveServerUrl
 import kotlinx.coroutines.Job
@@ -73,6 +75,13 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     var myId: String? = null
         private set
     private var watchJob: Job? = null
+    // 현재 watch_start를 보낸 대상. 저배터리 대상은 선택+확인한 동안에만 추적한다(기존과 동일).
+    private var watching: Set<String> = emptySet()
+    private var lowBatteryApprovedId: String? = null
+    private var cleared = false
+    private val prefs = Prefs(app)
+    private val _watchAllLive = MutableStateFlow(prefs.watchAllLive)
+    val watchAllLive: StateFlow<Boolean> = _watchAllLive
     private var historyDateJob: Job? = null
 
     private val appLifecycleObserver = object : DefaultLifecycleObserver {
@@ -86,13 +95,13 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             startLocationUpdatesJob()
-            _selectedId.value?.takeIf { it != myId }?.let {
-                WebSocketClient.get(getApplication())?.watchStart(it)
-            }
+            syncWatches()
         }
         override fun onStop(owner: LifecycleOwner) {
-            // 백그라운드 진입 시 활성 추적 해제 — 복귀했을 때 자동으로 이어 추적하지 않음
-            applySelection(_selectedId.value, null)
+            // 백그라운드 진입 시 활성 추적 해제 — 복귀했을 때 선택 대상을 자동으로 이어 추적하지 않음
+            _selectedId.value = null
+            lowBatteryApprovedId = null
+            syncWatches()
         }
     }
 
@@ -124,6 +133,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 }.toMap()
                 _positions.update { it + initial }
                 startLocationUpdatesJob()
+                syncWatches()
                 loadAvatars(members)
             }.onFailure { _error.value = it.message }
             _loading.value = false
@@ -140,6 +150,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }.toMap()
                 _positions.update { it + updated }
+                syncWatches()
             }
         }
     }
@@ -168,39 +179,68 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val _lowBatteryConfirmTarget = MutableStateFlow<String?>(null)
     val lowBatteryConfirmTarget: StateFlow<String?> = _lowBatteryConfirmTarget
 
+    // 전원 실시간 모드: 선택은 지도 포커스만 담당하고, 추적은 앱이 열려 있는 동안 가족 전원에게 건다.
+    // 선택 모드: 선택한 사람만 추적한다.
+    // 두 모드 모두 배터리 20% 이하인 사람은 선택 후 확인을 거친 경우에만 추적한다.
     fun selectMember(memberId: String) {
-        val prev = _selectedId.value
-        val next = if (prev == memberId) null else memberId
-        if (next != null && next != myId) {
-            val battery = _positions.value[next]?.battery
-            if (battery != null && battery <= 20) {
-                _lowBatteryConfirmTarget.value = memberId
-                return
-            }
+        val next = if (_selectedId.value == memberId) null else memberId
+        if (next != null && next != myId && next !in watching && isLowBattery(next)) {
+            _lowBatteryConfirmTarget.value = memberId
+            return
         }
-        applySelection(prev, next)
+        _selectedId.value = next
+        if (lowBatteryApprovedId != next) lowBatteryApprovedId = null
+        syncWatches()
+    }
+
+    fun setWatchAllLive(enabled: Boolean) {
+        prefs.watchAllLive = enabled
+        _watchAllLive.value = enabled
+        syncWatches()
     }
 
     fun confirmWatch(memberId: String) {
         _lowBatteryConfirmTarget.value = null
-        applySelection(_selectedId.value, memberId)
+        lowBatteryApprovedId = memberId
+        _selectedId.value = memberId
+        syncWatches()
     }
 
     fun dismissLowBatteryConfirm() {
         _lowBatteryConfirmTarget.value = null
     }
 
-    private fun applySelection(prev: String?, next: String?) {
-        _selectedId.value = next
+    private fun isLowBattery(memberId: String): Boolean =
+        _positions.value[memberId]?.battery?.let { it <= 20 } ?: false
+
+    // 이미 추적 중인 선택 대상은 도중에 배터리가 20% 이하로 떨어져도 끊지 않는다(기존 동작).
+    private fun isTrackedSelection(memberId: String): Boolean =
+        memberId == _selectedId.value && memberId in watching
+
+    private fun syncWatches() {
+        val active = !cleared &&
+            _historyMemberId.value == null &&
+            ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+        val candidates = when {
+            !active -> emptyList()
+            _watchAllLive.value -> _members.value.map { it.id }
+            else -> listOfNotNull(_selectedId.value)
+        }
+        val desired = candidates
+            .filter { it != myId && (it == lowBatteryApprovedId || !isLowBattery(it) || isTrackedSelection(it)) }
+            .toSet()
         val ws = WebSocketClient.get(getApplication()) ?: return
-        if (next != null && next != myId) ws.watchStart(next)
-        if (prev != null && prev != myId && prev != next) ws.watchStop(prev)
+        (desired - watching).forEach { ws.watchStart(it) }
+        (watching - desired).forEach { ws.watchStop(it) }
+        watching = desired
     }
 
     fun enterHistory(memberId: String) {
-        // 히스토리 진입 시 활성 추적을 멈춰 상대 폰의 GPS 부하/배터리 소모를 끊는다
-        applySelection(_selectedId.value, null)
+        // 히스토리 진입 시 활성 추적을 멈춰 상대 폰들의 GPS 부하/배터리 소모를 끊는다
+        _selectedId.value = null
+        lowBatteryApprovedId = null
         _historyMemberId.value = memberId
+        syncWatches()
         _historyPath.value = emptyList()
         val now = YearMonth.now()
         loadActiveDays(memberId, now.year, now.monthValue)
@@ -208,6 +248,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun exitHistory() {
         _historyMemberId.value = null
+        syncWatches()
         _historyActiveDays.value = emptySet()
         _historyPath.value = emptyList()
         _historyEvents.value = emptyList()
@@ -267,8 +308,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     override fun onCleared() {
         super.onCleared()
         ProcessLifecycleOwner.get().lifecycle.removeObserver(appLifecycleObserver)
-        _selectedId.value?.takeIf { it != myId }?.let {
-            WebSocketClient.get(getApplication())?.watchStop(it)
-        }
+        cleared = true
+        syncWatches()
     }
 }

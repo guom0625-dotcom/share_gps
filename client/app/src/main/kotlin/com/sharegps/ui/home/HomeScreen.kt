@@ -55,6 +55,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -156,8 +157,13 @@ fun HomeScreen(vm: HomeViewModel = viewModel()) {
     }
 
     var showSettings by remember { mutableStateOf(false) }
+    val watchAllLive by vm.watchAllLive.collectAsState()
     if (showSettings) {
-        WifiSettingsDialog(onDismiss = { showSettings = false })
+        SettingsDialog(
+            watchAllLive         = watchAllLive,
+            onWatchAllLiveChange = vm::setWatchAllLive,
+            onDismiss            = { showSettings = false },
+        )
     }
 
     // 멤버 리스트 패널 (portrait: 상단, landscape: 좌측)
@@ -811,7 +817,11 @@ private fun MoveEventRow(event: PathEvent.Move) {
 }
 
 @Composable
-private fun WifiSettingsDialog(onDismiss: () -> Unit) {
+private fun SettingsDialog(
+    watchAllLive:         Boolean,
+    onWatchAllLiveChange: (Boolean) -> Unit,
+    onDismiss:            () -> Unit,
+) {
     val context = LocalContext.current
     val prefs = remember { Prefs(context) }
     var savedSsid by remember { mutableStateOf(prefs.homeWifiSsid) }
@@ -819,9 +829,24 @@ private fun WifiSettingsDialog(onDismiss: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("집 WiFi 설정") },
+        title = { Text("설정") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("가족 전원 실시간 표시", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            if (watchAllLive) "앱을 여는 동안 모두의 위치를 실시간 갱신"
+                            else "선택한 사람만 실시간 갱신",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = watchAllLive, onCheckedChange = onWatchAllLiveChange)
+                }
+                androidx.compose.foundation.layout.Spacer(Modifier.size(8.dp))
+                HorizontalDivider()
+                androidx.compose.foundation.layout.Spacer(Modifier.size(8.dp))
                 Text("저장된 집 WiFi",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
